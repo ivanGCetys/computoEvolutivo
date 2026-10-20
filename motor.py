@@ -22,6 +22,7 @@ import random
 # ---------------------------------------------------------------------------
 FUEGO, HIELO, VIENTO, TIERRA = 0, 1, 2, 3
 NOMBRES_ELEM = ["fuego", "hielo", "viento", "tierra"]
+N_ELEMENTOS = len(NOMBRES_ELEM)
 VENCE = {FUEGO: HIELO, HIELO: VIENTO, VIENTO: TIERRA, TIERRA: FUEGO}
 
 
@@ -47,11 +48,14 @@ def calcular_dano(atk, poder, mult_elem, defensa, mult_bloqueo=1.0):
 # ---------------------------------------------------------------------------
 # 2. Equipo del jugador (tabla del briefing)
 # ---------------------------------------------------------------------------
+# Los héroes se nombran por su ROL, no por su elemento: el elemento cambia según el
+# equipo (A, B, C, D) pero los stats y el rol son siempre los mismos. Antes se
+# llamaban Fuego/Hielo/Viento/Tierra, que confundía al rotar los elementos.
 EQUIPO_BASE = [
-    {"nombre": "Fuego",  "elem": FUEGO,  "hp": 260, "sp": 60,  "atk": 60, "defe": 25, "vel": 20, "cura": False, "bloqueo": 0.5},
-    {"nombre": "Hielo",  "elem": HIELO,  "hp": 240, "sp": 120, "atk": 40, "defe": 30, "vel": 15, "cura": True,  "bloqueo": 0.5},
-    {"nombre": "Viento", "elem": VIENTO, "hp": 250, "sp": 80,  "atk": 50, "defe": 25, "vel": 30, "cura": False, "bloqueo": 0.5},
-    {"nombre": "Tierra", "elem": TIERRA, "hp": 380, "sp": 40,  "atk": 35, "defe": 60, "vel": 10, "cura": False, "bloqueo": 0.3},
+    {"nombre": "Guerrero",   "elem": FUEGO,  "hp": 260, "sp": 60,  "atk": 60, "defe": 25, "vel": 20, "cura": False, "bloqueo": 0.5},
+    {"nombre": "Curandero",  "elem": HIELO,  "hp": 240, "sp": 120, "atk": 40, "defe": 30, "vel": 15, "cura": True,  "bloqueo": 0.5},
+    {"nombre": "Explorador", "elem": VIENTO, "hp": 250, "sp": 80,  "atk": 50, "defe": 25, "vel": 30, "cura": False, "bloqueo": 0.5},
+    {"nombre": "Tanque",     "elem": TIERRA, "hp": 380, "sp": 40,  "atk": 35, "defe": 60, "vel": 10, "cura": False, "bloqueo": 0.3},
 ]
 
 PODER_BASICO = 0.8
@@ -63,11 +67,24 @@ UMBRAL_POCION, UMBRAL_CURA, UMBRAL_FUERTE = 0.30, 0.40, 0.50
 # PROVISIONAL (Fase 3): el heurístico del briefing no usa la acción de bloquear, así que
 # el bloqueo existe en la fórmula de daño (bloq) pero hoy nadie lo activa.
 
-# PROPUESTA (no se usa por defecto): segundo equipo con los MISMOS stats y los
-# elementos rotados. El curandero pasa a ser de tierra, el tanque de hielo, etc.
-EQUIPO_ROTADO = [dict(p) for p in EQUIPO_BASE]
-for _p, _e in zip(EQUIPO_ROTADO, [VIENTO, TIERRA, FUEGO, HIELO]):
-    _p["elem"] = _e
+# DECIDIDO 20-oct: hay CUATRO equipos, las 4 rotaciones del ciclo elemental sobre
+# los mismos 4 héroes. Mismos stats y mismo HP total (1130); lo único que cambia es
+# qué elemento le toca a cada rol: en A el curandero es de hielo, en B de viento, etc.
+# En el juego el jugador elige uno al empezar; para el AG el jefe debe ser justo
+# contra TODOS (ver evaluar_jefe), así que no puede abusar de un solo reparto.
+def _rotar_equipo(k):
+    """Devuelve el equipo base con todos los elementos corridos k lugares en el ciclo."""
+    eq = [dict(p) for p in EQUIPO_BASE]
+    for p in eq:
+        p["elem"] = (p["elem"] + k) % N_ELEMENTOS
+    return eq
+
+
+NOMBRES_EQUIPOS = ["A", "B", "C", "D"]
+EQUIPOS = {NOMBRES_EQUIPOS[k]: (EQUIPO_BASE if k == 0 else _rotar_equipo(k))
+           for k in range(N_ELEMENTOS)}
+EQUIPO_A, EQUIPO_B, EQUIPO_C, EQUIPO_D = (EQUIPOS[n] for n in NOMBRES_EQUIPOS)
+EQUIPO_ROTADO = EQUIPO_C          # nombre viejo, por compatibilidad
 
 # ---------------------------------------------------------------------------
 # 3. Jefe
@@ -241,7 +258,7 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                 if primera_muerte is None and any(h == 0 for h in hp):
                     primera_muerte = ronda
                 if all(h == 0 for h in hp):
-                    return _resultado(False, ronda, hp, usos, primera_muerte, False, hp_jefe, ronda_fase2)
+                    return _resultado(False, ronda, hp, usos, primera_muerte, False, hp_jefe, ronda_fase2, equipo)
             else:
                 i = a
                 if hp[i] <= 0:
@@ -265,14 +282,17 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                 else:
                     hp_jefe -= calcular_dano(yo["atk"], PODER_BASICO, 1.0, jefe["defe"], mg)
                 if hp_jefe <= 0:
-                    return _resultado(True, ronda, hp, usos, primera_muerte, False, max(0, hp_jefe), ronda_fase2)
+                    return _resultado(True, ronda, hp, usos, primera_muerte, False, max(0, hp_jefe), ronda_fase2, equipo)
     # Tope de rondas: cuenta como derrota del jefe (regla del briefing).
-    return _resultado(True, RONDAS_MAX, hp, usos, primera_muerte, True, hp_jefe, ronda_fase2)
+    return _resultado(True, RONDAS_MAX, hp, usos, primera_muerte, True, hp_jefe, ronda_fase2, equipo)
 
 
-def _resultado(gana_equipo, rondas, hp, usos, primera_muerte, tope, hp_jefe, ronda_fase2):
+def _resultado(gana_equipo, rondas, hp, usos, primera_muerte, tope, hp_jefe, ronda_fase2,
+               equipo=EQUIPO_BASE):
+    # El denominador es el HP total del equipo que se simuló, no uno fijo:
+    # así hp_final_pct sigue siendo un porcentaje si el equipo cambia de tamaño.
     return {"gana_equipo": gana_equipo, "rondas": rondas,
-            "hp_final_pct": sum(hp) / sum(p["hp"] for p in EQUIPO_BASE),
+            "hp_final_pct": sum(hp) / sum(p["hp"] for p in equipo),
             "hp_equipo": list(hp), "vivos": sum(1 for h in hp if h > 0), "usos": usos,
             "primera_muerte": primera_muerte, "tope": tope,
             "hp_jefe": hp_jefe, "ronda_fase2": ronda_fase2}
@@ -281,7 +301,9 @@ def _resultado(gana_equipo, rondas, hp, usos, primera_muerte, tope, hp_jefe, ron
 # ---------------------------------------------------------------------------
 # 7. Fitness (Monte Carlo)
 # ---------------------------------------------------------------------------
-BANDAS = {"facil": (0.70, 0.90), "media": (0.50, 0.70), "dificil": (0.20, 0.40)}
+# Banda de tasa de victoria del EQUIPO. "media" = combate parejo (decisión del 20/10).
+# Las otras dos quedan como estaban; solo se usa "media" en el avance.
+BANDAS = {"facil": (0.70, 0.90), "media": (0.40, 0.60), "dificil": (0.20, 0.40)}
 W_MARGEN, W_DURACION, W_VARIEDAD = 0.5, 0.25, 0.25
 RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 10, 3, 0.20
 
@@ -292,6 +314,27 @@ def evaluar(crom, equipo=EQUIPO_BASE, n=30, semilla=0, banda=BANDAS["media"]):
     crom = reparar(crom)
     resultados = [simular(crom, equipo, semilla + k) for k in range(n)]
     return calcular_fitness(resultados, banda)
+
+
+def evaluar_jefe(crom, n=30, semilla=0, banda=BANDAS["media"]):
+    """FUNCIÓN OBJETIVO F(x): fitness del jefe contra los 4 equipos, quedándose con
+    el PEOR. El jugador elige equipo al empezar, así que un jefe solo es bueno si es
+    parejo contra cualquiera de los cuatro. Con el mínimo, un jefe que abusa de un
+    reparto se castiga por ese reparto, no se salva con el promedio."""
+    crom = reparar(crom)
+    f = {k: evaluar(crom, eq, n, semilla, banda) for k, eq in EQUIPOS.items()}
+    peor = min(f, key=lambda k: f[k]["fitness"])
+    r = dict(f[peor])                       # las métricas son las del peor equipo
+    r["peor_equipo"] = peor
+    r["fitness_equipos"] = {k: f[k]["fitness"] for k in EQUIPOS}
+    r["p_victoria_equipos"] = {k: f[k]["p_victoria"] for k in EQUIPOS}
+    return r
+
+
+def costo(crom, n=30, semilla=0, banda=BANDAS["media"]):
+    """FUNCIÓN DE COSTO C(x) = 1 - F(x). Se MINIMIZA (notación del curso, L01).
+    F está en [0,1], así que C también. Mejor jefe = costo más bajo."""
+    return 1.0 - evaluar_jefe(crom, n, semilla, banda)["fitness"]
 
 
 def calcular_fitness(resultados, banda=BANDAS["media"]):

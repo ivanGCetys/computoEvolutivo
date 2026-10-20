@@ -141,19 +141,59 @@ def test_fitness_perfecto():
 
 
 def test_fitness_fuera_de_banda_y_margen():
-    # 9 de 10 victorias: distancia 0.2 -> f_win = 1 - 0.4 = 0.6
+    # Banda media = 40-60%. 9 de 10 victorias -> p = 0.9
+    # distancia a la banda: d = 0.9 - 0.60 = 0.30 -> f_win = 1 - 2(0.30) = 0.40
     # HP final 60%: margen = 1 - |0.6-0.2|/0.8 = 0.5
-    # 13 rondas: duración = exp(-9/18) = 0.6065
-    # fitness = 0.6 x (0.5x0.5 + 0.25x0.6065 + 0.25x1) = 0.6 x 0.6516 = 0.3910
+    # 13 rondas: duración = exp(-(13-10)^2 / (2x3^2)) = exp(-0.5) = 0.6065
+    # variedad: usos [1,1,1,1] -> H = 2 bits -> 2/2 = 1
+    # fitness = 0.40 x (0.5x0.5 + 0.25x0.6065 + 0.25x1) = 0.40 x 0.6516 = 0.2607
     res = [_res(True, 0.60, 13)] * 9 + [_res(False, 0.0, 13)]
     f = m.calcular_fitness(res)
-    assert f["f_win"] == pytest.approx(0.6)
+    assert f["f_win"] == pytest.approx(0.4)
     assert f["margen"] == pytest.approx(0.5)
     assert f["duracion"] == pytest.approx(math.exp(-0.5))
-    assert f["fitness"] == pytest.approx(0.6 * (0.25 + 0.25 * math.exp(-0.5) + 0.25))
+    assert f["fitness"] == pytest.approx(0.4 * (0.25 + 0.25 * math.exp(-0.5) + 0.25))
+    assert f["fitness"] == pytest.approx(0.2606533, abs=1e-6)
 
 
-def test_fitness_jefe_invencible_vale_cero():
-    # 0 victorias: distancia 0.5 -> f_win = 0 -> fitness 0 (sin importar lo demás)
-    res = [_res(False, 0.0, 10)] * 10
-    assert m.calcular_fitness(res)["fitness"] == 0.0
+def test_cuatro_equipos_toma_el_peor():
+    # Los 4 equipos son rotaciones: mismos stats y mismo HP total, solo cambia
+    # qué elemento le toca a cada rol. A = base; B, C y D corren 1, 2 y 3 lugares.
+    assert list(m.EQUIPOS) == ["A", "B", "C", "D"]
+    for eq in m.EQUIPOS.values():
+        assert sum(p["hp"] for p in eq) == 1130
+    assert [p["elem"] for p in m.EQUIPO_A] == [m.FUEGO, m.HIELO, m.VIENTO, m.TIERRA]
+    assert [p["elem"] for p in m.EQUIPO_B] == [m.HIELO, m.VIENTO, m.TIERRA, m.FUEGO]
+    assert [p["elem"] for p in m.EQUIPO_C] == [m.VIENTO, m.TIERRA, m.FUEGO, m.HIELO]
+    assert [p["elem"] for p in m.EQUIPO_D] == [m.TIERRA, m.FUEGO, m.HIELO, m.VIENTO]
+
+    crom = {"puntos": [300, 300, 200, 200], "elem1": m.FUEGO, "elem2": m.HIELO,
+            "habs": [0, 1, 2, 5], "pesos": [0.25] * 4}
+    r = m.evaluar_jefe(crom, n=10, semilla=0)
+    uno = {k: m.evaluar(m.reparar(crom), eq, n=10, semilla=0)["fitness"]
+           for k, eq in m.EQUIPOS.items()}
+    assert r["fitness"] == pytest.approx(min(uno.values()))
+    assert r["peor_equipo"] == min(uno, key=uno.get)
+    assert r["fitness_equipos"] == pytest.approx(uno)
+    # Costo = 1 - fitness (se minimiza)
+    assert m.costo(crom, n=10, semilla=0) == pytest.approx(1 - min(uno.values()))
+
+
+def test_fitness_extremos_quedan_abajo():
+    # Con la banda 40-60% ya NINGÚN jefe vale exactamente 0: la distancia máxima
+    # es 0.40, así que el piso de f_win es 1 - 2(0.40) = 0.20.
+    # Jefe invencible (0 victorias): d = 0.40 - 0 = 0.40 -> f_win = 0.20
+    #   margen = 0 (no hay victorias); duración = exp(0) = 1; variedad = 1
+    #   fitness = 0.20 x (0.5x0 + 0.25x1 + 0.25x1) = 0.20 x 0.5 = 0.10
+    invencible = [_res(False, 0.0, 10)] * 10
+    f_inv = m.calcular_fitness(invencible)
+    assert f_inv["f_win"] == pytest.approx(0.2)
+    assert f_inv["fitness"] == pytest.approx(0.10)
+
+    # Jefe trivial (10 de 10 victorias): d = 1.0 - 0.60 = 0.40 -> mismo f_win = 0.20
+    trivial = [_res(True, 0.95, 2)] * 10
+    assert m.calcular_fitness(trivial)["f_win"] == pytest.approx(0.2)
+
+    # Lo que importa: los dos extremos quedan muy por debajo de un jefe en banda.
+    en_banda = [_res(True, 0.20, 10)] * 5 + [_res(False, 0.0, 10)] * 5
+    assert m.calcular_fitness(en_banda)["fitness"] > 5 * f_inv["fitness"]

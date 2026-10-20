@@ -1,0 +1,5 @@
+metodo,fitness_medio,desv,fitness_min,fitness_max,revalidado_medio,evals_para_F0.70,evals_para_F0.80,seg_por_corrida
+rango,0.8674,0.0363,0.7969,0.9122,0.6983,88,204,6.6
+costo,0.8669,0.0271,0.8247,0.909,0.657,88,204,7.0
+torneo,0.8513,0.038,0.7882,0.9115,0.6182,88,233,7.0
+aleatoria,0.8001,0.0302,0.7593,0.8472,0.5919,72,603,7.2
