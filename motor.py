@@ -121,8 +121,14 @@ PRESA_UMBRAL, PRESA_MULT = 0.5, 1.5
 #              "habs": [4 índices distintos de 0..6], "pesos": [4 números >= 0]}
 
 def reparar(crom):
-    """Devuelve un cromosoma válido. No modifica el original."""
-    # Puntos: 100 fijos a cada atributo + 600 repartidos según la proporción.
+    """Devuelve un cromosoma válido. No modifica el original.
+    Es IDEMPOTENTE: reparar un cromosoma ya reparado no lo cambia. (Corregido 20-oct:
+    antes los puntos ya válidos se volvían a tratar como proporciones y el jefe
+    evaluado no era el mismo que el guardado.)"""
+    if _puntos_validos(crom["puntos"]):
+        enteros = [int(v) for v in crom["puntos"]]
+        return _reparar_resto(crom, enteros)
+    # Puntos crudos: 100 fijos a cada atributo + 600 repartidos según la proporción.
     crudos = [max(0.0, float(v)) for v in crom["puntos"]]
     total = sum(crudos)
     proporcion = [v / total for v in crudos] if total > 0 else [0.25] * 4
@@ -140,7 +146,19 @@ def reparar(crom):
     orden = sorted(range(4), key=lambda i: pts[i] - enteros[i], reverse=True)
     for i in orden[:faltan]:
         enteros[i] += 1
+    return _reparar_resto(crom, enteros)
 
+
+def _puntos_validos(puntos):
+    """True si los puntos YA son un reparto final: 4 enteros entre 100 y 500 que
+    suman 1000. Los crudos del AG (0..15) nunca cumplen esto."""
+    return (len(puntos) == 4 and all(float(v).is_integer() for v in puntos)
+            and sum(puntos) == PRESUPUESTO
+            and all(PUNTOS_MIN <= v <= PUNTOS_MAX for v in puntos))
+
+
+def _reparar_resto(crom, enteros):
+    """Habilidades, pesos y elementos. Esta parte ya era idempotente."""
     # Habilidades: sin repetir; un repetido se cambia por el menor índice libre.
     habs = []
     for h in crom["habs"]:
@@ -202,8 +220,17 @@ def objetivo_jefe(elem_jefe, equipo, hp):
 # ---------------------------------------------------------------------------
 # 6. Un combate
 # ---------------------------------------------------------------------------
-def simular(crom, equipo=EQUIPO_BASE, semilla=0):
-    """Simula un combate. crom debe venir reparado. Devuelve un diccionario."""
+def simular(crom, equipo=EQUIPO_BASE, semilla=0, registro=None, politica=None):
+    """Simula un combate. crom debe venir reparado. Devuelve un diccionario.
+
+    Si 'registro' es una lista, se le van agregando los eventos del combate
+    (diccionarios) para poder narrarlo después. NO cambia nada del cálculo:
+    con registro=None el combate es idéntico al de siempre.
+
+    Si 'politica' es una función, ella decide las acciones del equipo en vez del
+    heurístico. Así el modo interactivo usa EXACTAMENTE las mismas reglas que el
+    AG optimizó; lo único que cambia es quién elige. Recibe los mismos argumentos
+    que decidir_accion más un diccionario con el estado del jefe."""
     rng = random.Random(semilla)
     jefe = stats_jefe(crom)
     n = len(equipo)
@@ -221,12 +248,25 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
     actores = list(range(n)) + ["J"]
     actores.sort(key=lambda a: (-jefe["vel"], 1, 0) if a == "J" else (-equipo[a]["vel"], 0, a))
 
+    if registro is not None:
+        registro.append({"tipo": "inicio", "jefe": dict(jefe), "elem_jefe": elem_jefe,
+                         "elem_fase2": crom["elem2"], "hp_equipo": list(hp),
+                         "equipo": [p["nombre"] for p in equipo],
+                         "elems_equipo": [p["elem"] for p in equipo],
+                         "orden": ["JEFE" if x == "J" else equipo[x]["nombre"] for x in actores],
+                         "habs": [HABILIDADES[h][0] for h in crom["habs"]]})
+
     for ronda in range(1, RONDAS_MAX + 1):
+        if registro is not None:
+            registro.append({"tipo": "ronda", "ronda": ronda})
         for a in actores:
             if a == "J":
                 guardia = False
                 if ronda_fase2 is None and hp_jefe < 0.5 * jefe["hp"]:
                     elem_jefe, ronda_fase2 = crom["elem2"], ronda
+                    if registro is not None:
+                        registro.append({"tipo": "fase2", "ronda": ronda, "elem": elem_jefe,
+                                         "hp_jefe": hp_jefe})
                 disponibles = [k for k in range(4) if espera[k] == 0]
                 total = sum(crom["pesos"][k] for k in disponibles)
                 if total > 0:
@@ -240,6 +280,7 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                     elegido = disponibles[int(rng.random() * len(disponibles))]
                 nombre, poder, con_elem, cooldown, tipo = HABILIDADES[crom["habs"][elegido]]
                 usos[elegido] += 1
+                hp_antes = list(hp) if registro is not None else None
                 if tipo == "guardia":
                     guardia = True
                 elif tipo == "todos":
@@ -255,6 +296,14 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                     espera[k] = max(0, espera[k] - 1)
                 espera[elegido] = cooldown
                 hp = [max(0, h) for h in hp]
+                if registro is not None:
+                    danos = {equipo[j]["nombre"]: hp_antes[j] - hp[j]
+                             for j in range(n) if hp_antes[j] != hp[j]}
+                    registro.append({"tipo": "turno", "ronda": ronda, "actor": "JEFE",
+                                     "accion": nombre, "elem": elem_jefe if con_elem else None,
+                                     "danos": danos, "hp_equipo": list(hp), "hp_jefe": hp_jefe,
+                                     "muertos": [equipo[j]["nombre"] for j in range(n)
+                                                 if hp[j] == 0 and hp_antes[j] > 0]})
                 if primera_muerte is None and any(h == 0 for h in hp):
                     primera_muerte = ronda
                 if all(h == 0 for h in hp):
@@ -264,9 +313,16 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                 if hp[i] <= 0:
                     continue
                 bloq[i] = 1.0
-                accion, obj = decidir_accion(i, equipo, hp, sp, pociones, elem_jefe)
+                if politica is None:
+                    accion, obj = decidir_accion(i, equipo, hp, sp, pociones, elem_jefe)
+                else:
+                    accion, obj = politica(i, equipo, hp, sp, pociones, elem_jefe,
+                                           {"hp_jefe": hp_jefe, "jefe": jefe, "ronda": ronda,
+                                            "guardia": guardia, "elem_jefe": elem_jefe})
                 yo = equipo[i]
                 mg = GUARDIA_MULT if guardia else 1.0
+                if registro is not None:
+                    hp_jefe_antes, hp_antes = hp_jefe, list(hp)
                 if accion == "pocion":
                     pociones -= 1
                     hp[i] = min(yo["hp"], hp[i] + int(POCION_HP * yo["hp"]))
@@ -281,6 +337,14 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0):
                     hp_jefe -= calcular_dano(yo["atk"], PODER_FUERTE, 1.0, jefe["defe"], mg)
                 else:
                     hp_jefe -= calcular_dano(yo["atk"], PODER_BASICO, 1.0, jefe["defe"], mg)
+                if registro is not None:
+                    registro.append({"tipo": "turno", "ronda": ronda, "actor": yo["nombre"],
+                                     "accion": accion, "objetivo": equipo[obj]["nombre"] if obj is not None else None,
+                                     "dano_jefe": hp_jefe_antes - hp_jefe,
+                                     "cambio_propio": hp[i] - hp_antes[i],
+                                     "curado": hp[obj] - hp_antes[obj] if accion == "curar" and obj is not None else 0,
+                                     "jefe_en_guardia": guardia,
+                                     "hp_jefe": max(0, hp_jefe), "hp_equipo": list(hp)})
                 if hp_jefe <= 0:
                     return _resultado(True, ronda, hp, usos, primera_muerte, False, max(0, hp_jefe), ronda_fase2, equipo)
     # Tope de rondas: cuenta como derrota del jefe (regla del briefing).

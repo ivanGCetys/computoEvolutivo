@@ -49,6 +49,21 @@ def test_reparar_puntos_todo_a_hp():
     assert sum(c["puntos"]) == 1000
 
 
+def test_reparar_es_idempotente():
+    # Error encontrado el 20-oct: reparar dos veces cambiaba los puntos.
+    # [206,265,253,276] ya suma 1000 y todo está entre 100 y 500 -> no se toca.
+    c = {"puntos": [206, 265, 253, 276], "elem1": 1, "elem2": 2,
+         "habs": [3, 6, 0, 1], "pesos": [0.4, 0.3, 0.2, 0.1]}
+    r1 = m.reparar(c)
+    assert r1["puntos"] == [206, 265, 253, 276]
+    r2 = m.reparar(r1)
+    assert r2["puntos"] == r1["puntos"] and r2["habs"] == r1["habs"]
+    assert r2["pesos"] == pytest.approx(r1["pesos"])
+    # Y el caso crudo sigue funcionando igual que antes: [1,0,0,0] -> [500,167,167,166]
+    assert m.reparar({"puntos": [1, 0, 0, 0], "elem1": 0, "elem2": 0,
+                      "habs": [0, 1, 2, 3], "pesos": [1, 1, 1, 1]})["puntos"] == [500, 167, 167, 166]
+
+
 def test_reparar_pesos_y_habilidades():
     # pesos [1,0,0,0]: solo 1 habilidad > 10% -> la 2a mayor (índice 1) sube a 0.15
     # [1, 0.15, 0, 0] / 1.15 = [0.8696, 0.1304, 0, 0]
@@ -154,6 +169,42 @@ def test_fitness_fuera_de_banda_y_margen():
     assert f["duracion"] == pytest.approx(math.exp(-0.5))
     assert f["fitness"] == pytest.approx(0.4 * (0.25 + 0.25 * math.exp(-0.5) + 0.25))
     assert f["fitness"] == pytest.approx(0.2606533, abs=1e-6)
+
+
+def test_registro_no_cambia_el_combate():
+    # Lo más importante del combate narrado: activarlo NO debe alterar ningún número.
+    crom = m.reparar({"puntos": [3, 2, 2, 1], "elem1": 0, "elem2": 2,
+                      "habs": [0, 2, 4, 6], "pesos": [1, 1, 1, 1]})
+    for semilla in range(8):
+        for eq in m.EQUIPOS.values():
+            assert m.simular(crom, eq, semilla) == m.simular(crom, eq, semilla, registro=[])
+
+
+def test_politica_equivalente_da_el_mismo_combate():
+    # El modo interactivo cambia QUIÉN decide, no las reglas. Si la política hace
+    # lo mismo que el heurístico, el combate debe salir idéntico.
+    def como_el_heuristico(i, equipo, hp, sp, pociones, elem_jefe, ctx):
+        return m.decidir_accion(i, equipo, hp, sp, pociones, elem_jefe)
+
+    crom = m.reparar({"puntos": [3, 2, 2, 1], "elem1": 0, "elem2": 2,
+                      "habs": [0, 2, 4, 6], "pesos": [1, 1, 1, 1]})
+    for semilla in range(8):
+        for eq in m.EQUIPOS.values():
+            assert m.simular(crom, eq, semilla) == m.simular(crom, eq, semilla,
+                                                             politica=como_el_heuristico)
+
+
+def test_registro_cuadra_con_el_resultado():
+    crom = m.reparar({"puntos": [3, 2, 2, 1], "elem1": 0, "elem2": 2,
+                      "habs": [0, 2, 4, 6], "pesos": [1, 1, 1, 1]})
+    reg = []
+    r = m.simular(crom, m.EQUIPO_A, 0, registro=reg)
+    assert reg[0]["tipo"] == "inicio" and reg[0]["hp_equipo"] == [260, 240, 250, 380]
+    # El último turno registrado debe dejar al equipo como lo reporta el resultado.
+    turnos = [e for e in reg if e["tipo"] == "turno"]
+    assert turnos[-1]["hp_equipo"] == r["hp_equipo"]
+    # Hay tantas rondas registradas como dice el resultado.
+    assert max(e["ronda"] for e in reg if e["tipo"] == "ronda") == r["rondas"]
 
 
 def test_cuatro_equipos_toma_el_peor():

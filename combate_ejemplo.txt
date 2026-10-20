@@ -1,0 +1,104 @@
+No hay mejor_jefe.json todavía: corriendo el AG una vez...
+guardado en mejor_jefe.json (F = 0.8134)
+Jefe del AG.  Tasa de victoria del equipo por reparto: {'A': 0.63, 'B': 0.4, 'C': 0.47, 'D': 0.5}
+
+====================================================================
+ JEFE   VIENTO  ->  FUEGO (al bajar del 50% de HP)
+        HP 882   ATK 85   DEF 62   VEL 34.7
+        Habilidades: Zarpazo, Tormenta, Golpe pesado, Onda de choque
+ EQUIPO  Guerrero(hielo) 260   Curandero(viento) 240   Explorador(tierra) 250   Tanque(fuego) 380
+ Turnos: JEFE > Explorador > Guerrero > Curandero > Tanque
+====================================================================
+Ronda  1 | jefe  694/882 [#########...] | equipo  830/1130 | el jefe usó: Onda de choque
+Ronda  2 | jefe  555/882 [########....] | equipo  698/1130 | el jefe usó: Golpe pesado
+Ronda  3 | jefe  436/882 [######......] | equipo  464/1130 | el jefe usó: Tormenta
+  >>> FASE 2: el jefe cambia a FUEGO (HP 436, menos de la mitad)
+Ronda  4 | jefe  343/882 [#####.......] | equipo  339/1130 | el jefe usó: Onda de choque
+Ronda  5 | jefe  309/882 [####........] | equipo  354/1130 | el jefe usó: Golpe pesado
+Ronda  6 | jefe  292/882 [####........] | equipo  278/1130 | el jefe usó: Tormenta
+Ronda  7 | jefe  258/882 [####........] | equipo  239/1130 | el jefe usó: Onda de choque
+Ronda  8 | jefe  241/882 [###.........] | equipo  231/1130 | el jefe usó: Golpe pesado
+Ronda  9 | jefe  224/882 [###.........] | equipo  131/1130 | el jefe usó: Tormenta
+Ronda 10 | jefe  207/882 [###.........] | equipo  105/1130 | el jefe usó: Onda de choque
+Ronda 11 | jefe  190/882 [###.........] | equipo   20/1130 | el jefe usó: Golpe pesado
+Ronda 12 | jefe  190/882 [###.........] | equipo    0/1130 | el jefe usó: Onda de choque
+
+RESULTADO: gana el JEFE en 12 rondas.  HP del equipo al final: 0%
+Jefe del AG.  Tasa de victoria del equipo por reparto: {'A': 0.63, 'B': 0.4, 'C': 0.47, 'D': 0.5}
+
+====================================================================
+ JEFE   VIENTO  ->  FUEGO (al bajar del 50% de HP)
+        HP 882   ATK 85   DEF 62   VEL 34.7
+        Habilidades: Zarpazo, Tormenta, Golpe pesado, Onda de choque
+ EQUIPO  Guerrero(hielo) 260   Curandero(viento) 240   Explorador(tierra) 250   Tanque(fuego) 380
+ Turnos: JEFE > Explorador > Guerrero > Curandero > Tanque
+====================================================================
+
+--- Ronda 1 ---   jefe [####################] 882/882   equipo 1130/1130
+  JEFE          Onda de choque            Guerrero -34, Curandero -32, Explorador -34, Tanque -26
+  Explorador    ataque fuerte  jefe -49  (le cuesta 50 HP)
+  Guerrero      lanza magia  jefe -66
+  Curandero     ataque fuerte  jefe -39  (le cuesta 48 HP)
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 2 ---   jefe [################....] 694/882   equipo 830/1130
+  JEFE          Golpe pesado              Explorador -108
+  Explorador    bebe una poción  (+100 HP)
+  Guerrero      lanza magia  jefe -66
+  Curandero     ataque fuerte  jefe -39  (le cuesta 48 HP)
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 3 ---   jefe [#############.......] 555/882   equipo 698/1130
+  JEFE          Tormenta         (viento) Explorador -158
+       *** Explorador cae ***
+  Guerrero      lanza magia  jefe -66
+  Curandero     ataque básico  jefe -19
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 4 ---   jefe [##########..........] 436/882   equipo 464/1130
+  >>> FASE 2: el jefe cambia a FUEGO (HP 436, menos de la mitad)
+  JEFE          Onda de choque            Guerrero -34, Curandero -32, Tanque -26
+  Guerrero      ataque fuerte  jefe -59  (le cuesta 52 HP)
+  Curandero     cura a Tanque  (+95 HP)
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 5 ---   jefe [########............] 343/882   equipo 339/1130
+  JEFE          Golpe pesado              Guerrero -108
+  Guerrero      bebe una poción  (+104 HP)
+  Curandero     cura a Tanque  (+95 HP)
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 6 ---   jefe [#######.............] 309/882   equipo 354/1130
+  JEFE          Tormenta         (fuego)  Guerrero -136
+       *** Guerrero cae ***
+  Curandero     cura a Curandero  (+60 HP)
+  Tanque        ataque básico  jefe -17
+
+--- Ronda 7 ---   jefe [#######.............] 292/882   equipo 278/1130
+  JEFE          Onda de choque            Curandero -32, Tanque -26
+  Curandero     cura a Tanque  (+95 HP)
+  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+
+--- Ronda 8 ---   jefe [######..............] 258/882   equipo 239/1130
+  JEFE          Golpe pesado              Curandero -104
+  Curandero     bebe una poción  (+96 HP)
+  Tanque        ataque básico  jefe -17
+
+--- Ronda 9 ---   jefe [#####...............] 241/882   equipo 231/1130
+  JEFE          Tormenta         (fuego)  Curandero -100
+       *** Curandero cae ***
+  Tanque        ataque básico  jefe -17
+
+--- Ronda 10 ---   jefe [#####...............] 224/882   equipo 131/1130
+  JEFE          Onda de choque            Tanque -26
+  Tanque        ataque básico  jefe -17
+
+--- Ronda 11 ---   jefe [#####...............] 207/882   equipo 105/1130
+  JEFE          Golpe pesado              Tanque -85
+  Tanque        ataque básico  jefe -17
+
+--- Ronda 12 ---   jefe [####................] 190/882   equipo 20/1130
+  JEFE          Onda de choque            Tanque -20
+       *** Tanque cae ***
+
+RESULTADO: gana el JEFE en 12 rondas.  HP del equipo al final: 0%
