@@ -1,7 +1,7 @@
-"""
-Calibración: simula jefes aleatorios (como la población inicial de un AG) y reporta
-la distribución de la tasa de victoria del equipo. Uso: python calibrar.py
-"""
+# Calibración: simula jefes aleatorios, como la población inicial del algoritmo,
+# y cuenta cómo se reparte la tasa de victoria del equipo.
+#
+# Uso: python calibrar.py
 import random
 import time
 import motor as m
@@ -27,9 +27,12 @@ def correr(n_jefes=2000, n_sim=30, semilla=123):
 
 
 def histograma(filas, campo="p_victoria"):
+    # Los cortes en 0.0001 y 0.9999 separan a los jefes que siempre ganan o
+    # siempre pierden de los que casi siempre.
     cortes = [0, 0.0001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.9999, 1.0001]
     etiquetas = ["0", "(0,10%)", "[10,30%)", "[30,50%)", "[50,70%)", "[70,90%)", "[90,100%)", "100%"]
     cuenta = [0] * len(etiquetas)
+
     for _, f in filas:
         v = f[campo]
         for k in range(len(etiquetas)):
@@ -42,5 +45,5 @@ def histograma(filas, campo="p_victoria"):
 if __name__ == "__main__":
     t = time.time()
     filas = correr()
-    print("segundos:", round(time.time() - t, 1))
     print(histograma(filas))
+    print("segundos:", round(time.time() - t, 1))

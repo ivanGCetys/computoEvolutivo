@@ -1,7 +1,5 @@
-"""
-Pruebas a mano del motor v0.1. Cada valor esperado está calculado a mano en el
-comentario. Correr con:  python -m pytest -q
-"""
+# Pruebas a mano del motor v0.1. Cada valor esperado está calculado a mano en el
+# comentario. Correr con:  python -m pytest -q
 import math
 import pytest
 import motor as m
@@ -94,7 +92,7 @@ def test_ronda_1_a_mano(monkeypatch):
     # Hielo:  nadie < 40%; hielo vence a viento -> magia. SP 105. 40x1.2x1.5/2 = 36 -> 1376
     # Tierra: fuerte. HP 380-76=304. Daño 35x1.6/2      = 28 -> jefe 1348
     # Jefe:   Zarpazo (peso 1) a Tierra (débil a viento). 50x0.8x100/160 = 25 -> Tierra 279
-    monkeypatch.setattr(m, "RONDAS_MAX", 1)
+    monkeypatch.setattr(m.combate, "RONDAS_MAX", 1)
     crom = {"puntos": [500, 100, 300, 100], "elem1": m.VIENTO, "elem2": m.VIENTO,
             "habs": [0, 1, 2, 3], "pesos": [1, 0, 0, 0]}
     assert m.stats_jefe(crom) == {"hp": 1500, "atk": 50, "defe": 100, "vel": 10.0}
@@ -136,7 +134,7 @@ def test_fase2_ocurre():
 
 def test_fase2_no_ocurre_si_no_baja_de_50(monkeypatch):
     # Ronda 1 del test 5: el jefe queda en 1348 de 1500 (90%) -> no entra a fase 2
-    monkeypatch.setattr(m, "RONDAS_MAX", 1)
+    monkeypatch.setattr(m.combate, "RONDAS_MAX", 1)
     crom = {"puntos": [500, 100, 300, 100], "elem1": m.VIENTO, "elem2": m.FUEGO,
             "habs": [0, 1, 2, 3], "pesos": [1, 0, 0, 0]}
     assert m.simular(crom, semilla=0)["ronda_fase2"] is None
@@ -172,7 +170,7 @@ def test_fitness_fuera_de_banda_y_margen():
 
 
 def test_registro_no_cambia_el_combate():
-    # Lo más importante del combate narrado: activarlo NO debe alterar ningún número.
+    # Lo más importante del combate narrado: activarlo no debe alterar ningún número.
     crom = m.reparar({"puntos": [3, 2, 2, 1], "elem1": 0, "elem2": 2,
                       "habs": [0, 2, 4, 6], "pesos": [1, 1, 1, 1]})
     for semilla in range(8):
@@ -181,7 +179,7 @@ def test_registro_no_cambia_el_combate():
 
 
 def test_politica_equivalente_da_el_mismo_combate():
-    # El modo interactivo cambia QUIÉN decide, no las reglas. Si la política hace
+    # El modo interactivo cambia quién decide, no las reglas. Si la política hace
     # lo mismo que el heurístico, el combate debe salir idéntico.
     def como_el_heuristico(i, equipo, hp, sp, pociones, elem_jefe, ctx):
         return m.decidir_accion(i, equipo, hp, sp, pociones, elem_jefe)
@@ -231,7 +229,7 @@ def test_cuatro_equipos_toma_el_peor():
 
 
 def test_fitness_extremos_quedan_abajo():
-    # Con la banda 40-60% ya NINGÚN jefe vale exactamente 0: la distancia máxima
+    # Con la banda 40-60% ya ningún jefe vale exactamente 0: la distancia máxima
     # es 0.40, así que el piso de f_win es 1 - 2(0.40) = 0.20.
     # Jefe invencible (0 victorias): d = 0.40 - 0 = 0.40 -> f_win = 0.20
     #   margen = 0 (no hay victorias); duración = exp(0) = 1; variedad = 1

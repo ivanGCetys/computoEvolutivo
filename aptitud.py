@@ -1,0 +1,68 @@
+# Función objetivo F y función de costo C = 1 - F.
+# F sale de simular varios combates y medir qué tan parejo quedó el jefe.
+import math
+
+from reglas import EQUIPO_BASE, EQUIPOS
+from jefe import reparar
+from combate import simular
+
+# Tasa de victoria del equipo que buscamos en cada dificultad. Por ahora solo
+# se usa la media.
+BANDAS = {"facil": (0.70, 0.90), "media": (0.40, 0.60), "dificil": (0.20, 0.40)}
+W_MARGEN, W_DURACION, W_VARIEDAD = 0.5, 0.25, 0.25
+RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 10, 3, 0.20
+
+
+def evaluar(crom, equipo=EQUIPO_BASE, n=30, semilla=0, banda=BANDAS["media"]):
+    # Todos los individuos de una generación deben usar la misma semilla, si no
+    # se estarían comparando combates distintos.
+    crom = reparar(crom)
+    resultados = [simular(crom, equipo, semilla + k) for k in range(n)]
+    return calcular_fitness(resultados, banda)
+
+
+def evaluar_jefe(crom, n=30, semilla=0, banda=BANDAS["media"]):
+    # El jugador elige equipo al empezar, así que el jefe se queda con la nota
+    # de su peor equipo. Con el promedio, un jefe que abusa de un reparto de
+    # elementos se salvaría con los otros tres.
+    crom = reparar(crom)
+    f = {k: evaluar(crom, eq, n, semilla, banda) for k, eq in EQUIPOS.items()}
+    peor = min(f, key=lambda k: f[k]["fitness"])
+
+    r = dict(f[peor])
+    r["peor_equipo"] = peor
+    r["fitness_equipos"] = {k: f[k]["fitness"] for k in EQUIPOS}
+    r["p_victoria_equipos"] = {k: f[k]["p_victoria"] for k in EQUIPOS}
+    return r
+
+
+def costo(crom, n=30, semilla=0, banda=BANDAS["media"]):
+    return 1.0 - evaluar_jefe(crom, n, semilla, banda)["fitness"]
+
+
+def calcular_fitness(resultados, banda=BANDAS["media"]):
+    # Está separada de evaluar para poder probarla a mano con resultados inventados.
+    n = len(resultados)
+    victorias = [r for r in resultados if r["gana_equipo"]]
+    p = len(victorias) / n
+
+    lo, hi = banda
+    d = lo - p if p < lo else (p - hi if p > hi else 0.0)
+    f_win = 1 - 2 * d
+
+    margen = (sum(1 - abs(r["hp_final_pct"] - HP_IDEAL) / (1 - HP_IDEAL) for r in victorias) / len(victorias)
+              if victorias else 0.0)
+    duracion = sum(math.exp(-(r["rondas"] - RONDAS_IDEAL) ** 2 / (2 * SIGMA_RONDAS ** 2)) for r in resultados) / n
+
+    usos = [sum(r["usos"][k] for r in resultados) for k in range(4)]
+    total = sum(usos)
+    H = -sum(u / total * math.log2(u / total) for u in usos if u > 0)
+
+    # Con 4 habilidades la entropía máxima es log2(4) = 2 bits.
+    variedad = H / 2.0
+
+    fitness = f_win * (W_MARGEN * margen + W_DURACION * duracion + W_VARIEDAD * variedad)
+    return {"fitness": fitness, "p_victoria": p, "f_win": f_win, "margen": margen,
+            "duracion": duracion, "variedad": variedad,
+            "rondas_prom": sum(r["rondas"] for r in resultados) / n,
+            "tope_pct": sum(r["tope"] for r in resultados) / n}

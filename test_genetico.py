@@ -1,7 +1,5 @@
-"""
-Pruebas a mano del AG. Cada valor esperado está calculado en el comentario.
-Correr con:  python -m pytest -q
-"""
+# Pruebas a mano del AG. Cada valor esperado está calculado en el comentario.
+# Correr con:  python -m pytest -q
 import random
 import pytest
 import motor as m

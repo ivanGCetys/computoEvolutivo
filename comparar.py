@@ -1,10 +1,8 @@
-"""
-Comparación para el Avance 2: AG (con tres métodos de emparejamiento) contra
-búsqueda aleatoria, con el MISMO presupuesto de evaluaciones y varias repeticiones.
-
-Uso:  python comparar.py
-Genera: convergencia.png  y  resultados.csv
-"""
+# Compara el algoritmo genético, con tres métodos de emparejamiento, contra la
+# búsqueda aleatoria. Todos reciben el mismo presupuesto de evaluaciones.
+#
+# Uso: python comparar.py
+# Genera convergencia.png y resultados.csv
 import csv
 import statistics as st
 import time
@@ -13,16 +11,18 @@ import genetico as g
 
 REPETICIONES = 10
 POPSIZE, MAXIT, N_ELITE = 30, 20, 1
-EVALS = POPSIZE + MAXIT * (POPSIZE - N_ELITE)        # 610
+EVALS = POPSIZE + MAXIT * (POPSIZE - N_ELITE)
 N_SIM = 30
-SEMILLA_BUSQUEDA = 0                                  # semillas de combate al optimizar
-SEMILLA_PRUEBA = 500                                  # semillas NUEVAS para revalidar
+
+# Se optimiza con unas semillas de combate y se revalida con otras que el
+# algoritmo nunca vio.
+SEMILLA_BUSQUEDA = 0
+SEMILLA_PRUEBA = 500
 METODOS = ["rango", "costo", "torneo"]
 
 
 def curva_en_rejilla(historia, evals=EVALS):
-    """Convierte la historia (evaluaciones, mejor_costo) en un valor por evaluación,
-    para poder promediar curvas de distinta longitud."""
+    # Deja un valor por evaluación para poder promediar curvas de distinto largo.
     fila, k = [], 0
     for e in range(1, evals + 1):
         while k + 1 < len(historia) and historia[k + 1][0] <= e:
@@ -32,8 +32,8 @@ def curva_en_rejilla(historia, evals=EVALS):
 
 
 def revalidar(bits):
-    """Reevalúa al mejor jefe con semillas que NUNCA se usaron al optimizar.
-    Si el fitness se cae mucho, el AG se sobreajustó a las semillas."""
+    # Si el fitness se cae mucho con semillas nuevas, el algoritmo se
+    # sobreajustó a las semillas con las que buscó.
     return m.evaluar_jefe(g.decodificar(bits), n=N_SIM, semilla=SEMILLA_PRUEBA)["fitness"]
 
 
@@ -41,6 +41,7 @@ def correr_todo():
     datos = {}
     for metodo in METODOS + ["aleatoria"]:
         finales, revalidados, curvas, segundos = [], [], [], []
+
         for rep in range(REPETICIONES):
             t = time.time()
             if metodo == "aleatoria":
@@ -50,21 +51,20 @@ def correr_todo():
                 bits, c, hist = g.correr_ag(semilla_rng=100 + rep, popsize=POPSIZE, maxit=MAXIT,
                                             n_elite=N_ELITE, n_sim=N_SIM,
                                             semilla_sim=SEMILLA_BUSQUEDA, seleccion=metodo)
-            finales.append(1 - c)                      # fitness del mejor encontrado
+            finales.append(1 - c)
             revalidados.append(revalidar(bits))
             curvas.append(curva_en_rejilla(hist))
             segundos.append(time.time() - t)
+
         datos[metodo] = {"fitness": finales, "revalidado": revalidados,
                          "curva": [st.mean(col) for col in zip(*curvas)],
                          "segundos": st.mean(segundos)}
-        print("%-10s F = %.4f +- %.4f  (revalidado %.4f)  %.1f s/corrida"
-              % (metodo, st.mean(finales), st.pstdev(finales),
-                 st.mean(revalidados), datos[metodo]["segundos"]))
+        print("%-10s F = %.4f +- %.4f  (revalidado %.4f)"
+              % (metodo, st.mean(finales), st.pstdev(finales), st.mean(revalidados)))
     return datos
 
 
 def evals_para_llegar(curva, objetivo):
-    """Cuántas evaluaciones necesitó la curva promedio para bajar de 1-objetivo."""
     for i, c in enumerate(curva, start=1):
         if 1 - c >= objetivo:
             return i
@@ -83,9 +83,12 @@ def guardar(datos):
                         evals_para_llegar(d["curva"], 0.70), evals_para_llegar(d["curva"], 0.80),
                         round(d["segundos"], 1)])
 
+    # El backend Agg dibuja directo a archivo, sin abrir ventana, para que el
+    # script corra igual en una terminal sin entorno gráfico.
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
     estilos = {"rango": "-", "costo": "--", "torneo": "-.", "aleatoria": ":"}
     etiquetas = {"rango": "AG, rango", "costo": "AG, costo",
@@ -93,6 +96,7 @@ def guardar(datos):
     for k, d in datos.items():
         ax.plot(range(1, EVALS + 1), [1 - c for c in d["curva"]],
                 estilos[k], label=etiquetas[k], linewidth=1.8)
+
     ax.set_xlabel("Evaluaciones de la función de costo")
     ax.set_ylabel("Mejor fitness F encontrado")
     ax.set_title("Convergencia: promedio de %d corridas" % REPETICIONES)
@@ -100,11 +104,8 @@ def guardar(datos):
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig("convergencia.png", dpi=160)
-    print("\nguardados: convergencia.png y resultados.csv")
 
 
 if __name__ == "__main__":
-    t = time.time()
     datos = correr_todo()
     guardar(datos)
-    print("total %.0f s" % (time.time() - t))

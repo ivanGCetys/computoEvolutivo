@@ -47,7 +47,11 @@ El juego usa exactamente las mismas reglas con las que el AG calificó al jefe. 
 
 Archivos
 Archivo	Qué hace
-motor.py	Reglas del juego, combate, función objetivo F y función de costo C = 1 − F
+motor.py	Fachada: junta los cuatro módulos de abajo para que los scripts sigan usando import motor
+reglas.py	Elementos, fórmula de daño y equipos
+jefe.py	Puntos y habilidades del jefe, reparación del cromosoma
+combate.py	Simulación de un combate y jugador automático
+aptitud.py	Función objetivo F y función de costo C = 1 − F
 genetico.py	AG binario de 44 bits (selección por rango, cruce de un punto, mutación, elitismo) y búsqueda aleatoria
 comparar.py	AG contra búsqueda aleatoria, 10 repeticiones, mismo presupuesto de evaluaciones
 narrar.py	Cuenta un combate turno por turno
