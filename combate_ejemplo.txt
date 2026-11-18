@@ -1,76 +1,86 @@
-Tasa de victoria del equipo por reparto: {'A': 0.63, 'B': 0.4, 'C': 0.47, 'D': 0.5}
+Tasa de victoria del equipo, promedio de los 15 equipos: 0.47
 
-Jefe de viento, cambia a fuego al bajar de 50% de HP
-  HP 882   ATK 85   DEF 62   VEL 34.7
-  Habilidades: Zarpazo, Tormenta, Golpe pesado, Onda de choque
-Equipo: Guerrero (hielo) 260   Curandero (viento) 240   Explorador (tierra) 250   Tanque (fuego) 380
-Orden de turnos: Jefe, Explorador, Guerrero, Curandero, Tanque
+Jefe con Talisman de planta, cambia a Talisman de rayo al bajar de 50% de vida
+  Vida 777   Ataque 90   Defensa 122   Ataque magico 287   Defensa magica 90   Velocidad 22.2
+  Cola de ataques: Llamarada, Garra sombria, Avalancha, Incendio, Marejada, Aplastamiento, Zarpazo, Chorro
+Equipo: Guerrero 300   Tanque 480   Mago 210   Clerigo 300
+  Conjuros de Guerrero: Guardia de acero, Tajo elemental, Tajo mayor
+  Conjuros de Mago: Llama, Remolino, Zarza, Juicio
+Orden de turnos: Guerrero, Mago, Clerigo, Jefe, Tanque
 
-Ronda 1   jefe 882/882   equipo 1130/1130
-  Jefe          Onda de choque            Guerrero -34, Curandero -32, Explorador -34, Tanque -26
-  Explorador    ataque fuerte  jefe -49  (le cuesta 50 HP)
-  Guerrero      lanza magia  jefe -66
-  Curandero     ataque fuerte  jefe -39  (le cuesta 48 HP)
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+Ronda 1   jefe 777/777   equipo 1290/1290
+  Guerrero   Tajo mayor de luz                  Jefe -40
+  Mago       Juicio de luz                      Jefe -125
+  Clerigo    Ataque basico                      Jefe -12
+  Jefe       Incendio de fuego                  Guerrero -130, Tanque -113, Mago -128, Clerigo -128
+  Tanque     Ataque basico                      Jefe -10
 
-Ronda 2   jefe 694/882   equipo 830/1130
-  Jefe          Golpe pesado              Explorador -108
-  Explorador    bebe una poción  (+100 HP)
-  Guerrero      lanza magia  jefe -66
-  Curandero     ataque fuerte  jefe -39  (le cuesta 48 HP)
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+Ronda 2   jefe 590/777   equipo 791/1290
+  Guerrero   Guardia de acero
+  Mago       Llama de fuego                     Jefe -75
+  Clerigo    Curacion menor                     Mago +48
+  Jefe       Garra sombria de oscuridad         Tanque -257
+  Tanque     Bebe pocion de vida                Tanque +144
 
-Ronda 3   jefe 555/882   equipo 698/1130
-  Jefe          Tormenta         (viento) Explorador -158
-      Explorador cae
-  Guerrero      lanza magia  jefe -66
-  Curandero     ataque básico  jefe -19
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
+Ronda 3   jefe 515/777   equipo 726/1290
+  Guerrero   Tajo mayor de luz                  Jefe -39
+  Mago       Llama de fuego                     Jefe -81
+  Clerigo    Curacion menor                     Tanque +48
+  Jefe       Marejada de agua                   Guerrero -132, Tanque -125, Mago -128, Clerigo -121
+  Tanque     Muralla
 
-Ronda 4   jefe 436/882   equipo 464/1130
-  Fase 2: el jefe cambia a fuego (HP 436, menos de la mitad)
-  Jefe          Onda de choque            Guerrero -34, Curandero -32, Tanque -26
-  Guerrero      ataque fuerte  jefe -59  (le cuesta 52 HP)
-  Curandero     cura a Tanque  (+95 HP)
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
-
-Ronda 5   jefe 343/882   equipo 339/1130
-  Jefe          Golpe pesado              Guerrero -108
-  Guerrero      bebe una poción  (+104 HP)
-  Curandero     cura a Tanque  (+95 HP)
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
-
-Ronda 6   jefe 309/882   equipo 354/1130
-  Jefe          Tormenta         (fuego)  Guerrero -136
-      Guerrero cae
-  Curandero     cura a Curandero  (+60 HP)
-  Tanque        ataque básico  jefe -17
-
-Ronda 7   jefe 292/882   equipo 278/1130
-  Jefe          Onda de choque            Curandero -32, Tanque -26
-  Curandero     cura a Tanque  (+95 HP)
-  Tanque        ataque fuerte  jefe -34  (le cuesta 76 HP)
-
-Ronda 8   jefe 258/882   equipo 239/1130
-  Jefe          Golpe pesado              Curandero -104
-  Curandero     bebe una poción  (+96 HP)
-  Tanque        ataque básico  jefe -17
-
-Ronda 9   jefe 241/882   equipo 231/1130
-  Jefe          Tormenta         (fuego)  Curandero -100
-      Curandero cae
-  Tanque        ataque básico  jefe -17
-
-Ronda 10   jefe 224/882   equipo 131/1130
-  Jefe          Onda de choque            Tanque -26
-  Tanque        ataque básico  jefe -17
-
-Ronda 11   jefe 207/882   equipo 105/1130
-  Jefe          Golpe pesado              Tanque -85
-  Tanque        ataque básico  jefe -17
-
-Ronda 12   jefe 190/882   equipo 20/1130
-  Jefe          Onda de choque            Tanque -20
+Ronda 4   jefe 395/777   equipo 268/1290
+  Guerrero   Bebe pocion grande de vida         Guerrero +180
+  Mago       Bebe pocion de vida                Mago +63
+  Clerigo    Curacion en grupo                  Guerrero +36, Tanque +36, Mago +36, Clerigo +36
+  Jefe       Llamarada de fuego                 Tanque -220
       Tanque cae
 
-Resultado: gana el jefe en 12 rondas. HP del equipo al final: 0%
+Ronda 5   jefe 395/777   equipo 442/1290
+  Guerrero   Ataque basico                      Jefe -18
+  Mago       Llama de fuego                     Jefe -76
+  Clerigo    Curacion en grupo                  Guerrero +36, Mago +36, Clerigo +36
+  Fase 2: el jefe cambia a Talisman de rayo y aprende Onda de choque y Golpe pesado (vida 301, menos de la mitad)
+    Vida 777   Ataque 103   Defensa 128   Ataque magico 330   Defensa magica 103   Velocidad 23.3
+  Jefe       Carga Aplastamiento
+
+Ronda 6   jefe 301/777   equipo 550/1290
+  Guerrero   Ataque basico                      Jefe -19
+  Mago       Llama de fuego                     Jefe -71
+  Clerigo    Curacion menor                     Clerigo +48
+  Jefe       Aplastamiento                      Guerrero -180
+
+Ronda 7   jefe 211/777   equipo 418/1290
+  Guerrero   Ataque basico                      Jefe -15
+  Mago       Bebe pocion de mana
+  Clerigo    Curacion menor                     Guerrero +48
+  Jefe       Zarpazo                            Guerrero -53
+
+Ronda 8   jefe 196/777   equipo 413/1290
+  Guerrero   Ataque basico                      Jefe -28 (critico)
+  Mago       Llama de fuego                     Jefe -78
+  Clerigo    Bebe pocion de mana
+  Jefe       Garra sombria de oscuridad         Mago -303
+      Mago cae
+
+Ronda 9   jefe 90/777   equipo 276/1290
+  Guerrero   Ataque basico                      Jefe -20
+  Clerigo    Curacion menor                     Guerrero +48
+  Jefe       Golpe pesado                       Guerrero -120
+
+Ronda 10   jefe 70/777   equipo 204/1290
+  Guerrero   Ataque basico                      Jefe -16
+  Clerigo    Curacion mayor                     Guerrero +96
+  Jefe       Marejada de agua                   Guerrero -146, Clerigo -150
+      Guerrero cae
+
+Ronda 11   jefe 54/777   equipo 21/1290
+  Clerigo    Curacion menor                     Clerigo +48
+  Jefe       Onda de choque                     Clerigo -43
+
+Ronda 12   jefe 54/777   equipo 26/1290
+  Clerigo    Curacion menor                     Clerigo +48
+  Jefe       Llamarada de fuego                 Clerigo -325
+      Clerigo cae
+
+Resultado: gana el jefe en 12 rondas. Vida del equipo al final: 0%

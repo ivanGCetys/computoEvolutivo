@@ -1,5 +1,5 @@
-metodo,fitness_medio,desv,fitness_min,fitness_max,revalidado_medio,evals_para_F0.70,evals_para_F0.80,seg_por_corrida
-rango,0.8861,0.017,0.8502,0.911,0.6865,117,204,7.2
-costo,0.8597,0.0409,0.7671,0.9021,0.6974,175,233,7.1
-torneo,0.8603,0.0263,0.8113,0.8902,0.7228,117,175,6.8
-aleatoria,0.7869,0.0436,0.7097,0.8703,0.5485,136,,6.7
+metodo,fitness_medio,desv,fitness_min,fitness_max,revalidado_medio,evals_para_F0.60,evals_para_F0.70,seg_por_corrida
+rango,0.7512,0.015,0.7335,0.7757,0.6056,1,233,31.0
+costo,0.7573,0.015,0.7353,0.785,0.6288,1,204,40.1
+torneo,0.7429,0.0194,0.7073,0.7689,0.6354,1,233,26.9
+aleatoria,0.6976,0.0239,0.6463,0.7326,0.6204,14,,22.3

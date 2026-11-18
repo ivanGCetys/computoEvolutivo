@@ -10,24 +10,46 @@ import motor as m
 
 ARCHIVO_JEFE = "mejor_jefe.json"
 
-ACCIONES = {"pocion": "bebe una poción", "curar": "cura a", "magia": "lanza magia",
-            "fuerte": "ataque fuerte", "basico": "ataque básico"}
+notasGolpe = {"critico": " (critico)", "esquiva": " esquiva", "bloqueado": " lo bloquea por completo"}
+
+
+def textoStats(s):
+    return ("Vida %d   Ataque %d   Defensa %d   Ataque magico %d   Defensa magica %d   Velocidad %.1f"
+            % (s["hp"], s["atk"], s["defe"], s["atkMag"], s["defMag"], s["vel"]))
+
+
+def textoTurno(ev):
+    # Arma la parte de un turno que dice a quién se le pegó o se le curó.
+    partes = []
+    for nombre, dano, nota in ev["golpes"]:
+        if nota in ("esquiva", "bloqueado"):
+            partes.append(nombre + notasGolpe[nota])
+        else:
+            partes.append("%s -%d%s" % (nombre, dano, notasGolpe.get(nota, "")))
+    for nombre, cantidad in ev["curas"]:
+        partes.append("%s +%d" % (nombre, cantidad))
+
+    accion = ev["accion"]
+    if ev["elem"] is not None:
+        accion += " de " + m.NOMBRES_ELEM[ev["elem"]]
+    if ev.get("adelantado"):
+        accion += ", se adelanta"
+    return accion, ", ".join(partes)
 
 
 def lineas(registro, detalle=True):
     out, ini = [], registro[0]
-    jefe, elem = ini["jefe"], m.NOMBRES_ELEM
-    hp_jefe_max = jefe["hp"]
+    hp_jefe_max = ini["jefe"]["hp"]
     hp_eq_max = sum(ini["hp_equipo"])
 
-    out.append("Jefe de %s, cambia a %s al bajar de 50%% de HP"
-               % (elem[ini["elem_jefe"]], elem[ini["elem_fase2"]]))
-    out.append("  HP %d   ATK %d   DEF %d   VEL %.1f"
-               % (jefe["hp"], jefe["atk"], jefe["defe"], jefe["vel"]))
-    out.append("  Habilidades: " + ", ".join(ini["habs"]))
-    out.append("Equipo: " + "   ".join("%s (%s) %d" % (n, elem[e], h) for n, e, h
-                                       in zip(ini["equipo"], ini["elems_equipo"], ini["hp_equipo"])))
-    out.append("Orden de turnos: " + ", ".join(x.capitalize() for x in ini["orden"]))
+    out.append("Jefe con %s, cambia a %s al bajar de 50%% de vida" % (ini["objeto"], ini["objeto2"]))
+    out.append("  " + textoStats(ini["jefe"]))
+    out.append("  Cola de ataques: " + ", ".join(ini["habs"]))
+    out.append("Equipo: " + "   ".join("%s %d" % (n, h) for n, h in zip(ini["equipo"], ini["hp_equipo"])))
+    for nombre in ini["equipo"]:
+        if nombre in ("Mago", "Guerrero"):
+            out.append("  Conjuros de %s: %s" % (nombre, ", ".join(ini["conjuros"][nombre])))
+    out.append("Orden de turnos: " + ", ".join(ini["orden"]))
 
     # En modo resumen se guarda el estado con que empezó cada ronda y lo que usó el jefe.
     hp_jefe, hp_eq, acciones_jefe = hp_jefe_max, hp_eq_max, []
@@ -45,35 +67,22 @@ def lineas(registro, detalle=True):
             ronda_actual = ev["ronda"]
 
         elif ev["tipo"] == "fase2":
-            out.append("  Fase 2: el jefe cambia a %s (HP %d, menos de la mitad)"
-                       % (elem[ev["elem"]], ev["hp_jefe"]))
+            out.append("  Fase 2: el jefe cambia a %s y aprende %s (vida %d, menos de la mitad)"
+                       % (ev["objeto"], " y ".join(ev["nuevos"]), ev["hp_jefe"]))
+            if detalle:
+                out.append("    " + textoStats(ev["jefe"]))
 
         elif ev["tipo"] == "turno":
             hp_jefe, hp_eq = ev["hp_jefe"], sum(ev["hp_equipo"])
-            if ev["actor"] == "JEFE":
+            if ev["actor"] == "Jefe":
                 acciones_jefe.append(ev["accion"])
-                if detalle:
-                    sufijo = " (%s)" % elem[ev["elem"]] if ev["elem"] is not None else ""
-                    golpes = ", ".join("%s -%d" % (k, v) for k, v in ev["danos"].items()) or "sin daño"
-                    out.append("  %-13s %-16s%-9s %s" % ("Jefe", ev["accion"], sufijo, golpes))
-                    for muerto in ev["muertos"]:
-                        out.append("      %s cae" % muerto)
+            if detalle:
+                accion, efecto = textoTurno(ev)
+                out.append(("  %-10s %-34s %s" % (ev["actor"], accion, efecto)).rstrip())
+                for muerto in ev["muertos"]:
+                    out.append("      %s cae" % muerto)
 
-            elif detalle:
-                verbo = ACCIONES[ev["accion"]]
-                if ev["accion"] == "curar":
-                    detalle_txt = "%s %s  (+%d HP)" % (verbo, ev["objetivo"], ev["curado"])
-                elif ev["accion"] == "pocion":
-                    detalle_txt = "%s  (+%d HP)" % (verbo, ev["cambio_propio"])
-                else:
-                    detalle_txt = "%s  jefe -%d" % (verbo, ev["dano_jefe"])
-                    if ev["cambio_propio"] < 0:
-                        detalle_txt += "  (le cuesta %d HP)" % -ev["cambio_propio"]
-                    if ev["jefe_en_guardia"]:
-                        detalle_txt += "  (el jefe estaba en guardia)"
-                out.append("  %-13s %s" % (ev["actor"], detalle_txt))
-
-    if not detalle:
+    if not detalle and len(registro) > 1:
         out.append(_resumen(ronda_actual, hp_jefe, hp_eq, acciones_jefe, hp_jefe_max, hp_eq_max))
     return out
 
@@ -83,13 +92,13 @@ def _resumen(ronda, hp_jefe, hp_eq, acciones, hp_jefe_max, hp_eq_max):
             % (ronda, hp_jefe, hp_jefe_max, hp_eq, hp_eq_max, ", ".join(acciones) or "nada"))
 
 
-def narrar(crom, equipo=m.EQUIPO_A, semilla=0, detalle=True):
+def narrar(crom, equipo=m.EQUIPO_BASE, semilla=0, detalle=True):
     reg = []
     res = m.simular(m.reparar(crom), equipo, semilla, registro=reg)
 
     texto = lineas(reg, detalle)
     texto.append("")
-    texto.append("Resultado: %s en %d rondas. HP del equipo al final: %.0f%%"
+    texto.append("Resultado: %s en %d rondas. Vida del equipo al final: %.0f%%"
                  % ("gana el equipo" if res["gana_equipo"] else "gana el jefe",
                     res["rondas"], 100 * res["hp_final_pct"]))
     if res["tope"]:
@@ -98,12 +107,16 @@ def narrar(crom, equipo=m.EQUIPO_A, semilla=0, detalle=True):
 
 
 def cargar_o_crear_mejor():
+    # Un archivo guardado con el formato de una versión anterior del juego no
+    # sirve, así que se trata igual que si no existiera.
     if os.path.exists(ARCHIVO_JEFE):
         with open(ARCHIVO_JEFE) as f:
-            return json.load(f)
+            crom = json.load(f)
+        if "predisposicion" in crom:
+            return crom
 
-    # Sin archivo guardado se corre el algoritmo una vez, con la misma semilla
-    # de siempre para que el jefe sea reproducible.
+    # Se corre el algoritmo una vez, con la misma semilla de siempre para que
+    # el jefe sea reproducible.
     import genetico as g
     bits, c, _ = g.correr_ag(semilla_rng=1, verbose=False)
     crom = g.decodificar(bits)
@@ -116,9 +129,8 @@ def cargar_o_crear_mejor():
 if __name__ == "__main__":
     detalle = "resumen" not in sys.argv
     crom = cargar_o_crear_mejor()
-    r = m.evaluar_jefe(crom, n=30, semilla=0)
+    r = m.evaluar_jefe(crom)
 
-    print("Tasa de victoria del equipo por reparto: %s\n"
-          % {k: round(v, 2) for k, v in r["p_victoria_equipos"].items()})
-    texto, _ = narrar(crom, m.EQUIPOS[r["peor_equipo"]], semilla=0, detalle=detalle)
+    print("Tasa de victoria del equipo, promedio de los 15 equipos: %.2f\n" % r["p_victoria"])
+    texto, _ = narrar(crom, m.EQUIPO_BASE, semilla=0, detalle=detalle)
     print(texto)

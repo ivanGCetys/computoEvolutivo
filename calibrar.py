@@ -5,23 +5,22 @@
 import random
 import time
 import motor as m
+import genetico as g
 
 
 def jefe_aleatorio(rng):
-    return m.reparar({
-        "puntos": [rng.random() for _ in range(4)],
-        "elem1": rng.randrange(4), "elem2": rng.randrange(4),
-        "habs": rng.sample(range(m.N_HABILIDADES), 4),
-        "pesos": [rng.random() for _ in range(4)],
-    })
+    # Igual que la población inicial del algoritmo: bits al azar y a decodificar.
+    return g.decodificar(g.bits_al_azar(rng))
 
 
-def correr(n_jefes=2000, n_sim=30, semilla=123):
+def correr(n_jefes=500, n_sim=m.combatesPorEquipo, semilla=123):
+    # Cada jefe pelea contra los 15 equipos, así que la tasa de victoria que se
+    # cuenta es el promedio de todos.
     rng = random.Random(semilla)
     filas = []
     for _ in range(n_jefes):
         c = jefe_aleatorio(rng)
-        f = m.evaluar(c, n=n_sim, semilla=0)
+        f = m.evaluar_jefe(c, n=n_sim, semilla=0)
         filas.append((c, f))
     return filas
 

@@ -6,14 +6,21 @@
 import random
 import motor as m
 
-# El cromosoma son 44 bits partidos en tramos. Cada tramo es nombre, cuántos
+# El cromosoma son 134 bits partidos en tramos. Cada tramo es nombre, cuántos
 # valores guarda y cuántos bits ocupa cada valor:
-#   puntos  4 valores de 4 bits, la proporción del presupuesto por atributo
-#   elems   2 valores de 2 bits, el elemento de cada fase
-#   habs    4 valores de 3 bits, el índice de la habilidad
-#   pesos   4 valores de 3 bits, qué tanto usa cada habilidad
+#   puntos          6 de 4 bits, la proporción del presupuesto por atributo
+#   objetos         2 de 4 bits, el objeto equipado en cada fase
+#   habs            8 de 5 bits, los ataques de la cola tomados del banco de 32
+#   pesos           8 de 2 bits, qué tanto prefiere cada ataque de la cola
+#   posCambios      2 de 3 bits, qué posiciones de la cola cambian en la fase 2
+#   nuevosCambios   2 de 5 bits, por cuáles ataques se cambian
+#   ajustes         5 de 2 bits, cómo se mueve cada atributo en la fase 2
+#   predisposicion  6 de 3 bits, preferencia por atacar a cada clase
+#   bloqueo         1 de 2 bits, qué tan seguido bloquea
 # Los valores crudos no tienen que ser válidos porque motor.reparar los arregla.
-TRAMOS = [("puntos", 4, 4), ("elems", 2, 2), ("habs", 4, 3), ("pesos", 4, 3)]
+TRAMOS = [("puntos", 6, 4), ("objetos", 2, 4), ("habs", 8, 5), ("pesos", 8, 2),
+          ("posCambios", 2, 3), ("nuevosCambios", 2, 5), ("ajustes", 5, 2),
+          ("predisposicion", 6, 3), ("bloqueo", 1, 2)]
 N_BITS = sum(cuantos * ancho for _, cuantos, ancho in TRAMOS)
 
 
@@ -32,15 +39,19 @@ def decodificar(bits):
         i += cuantos * ancho
 
     return m.reparar({"puntos": campos["puntos"],
-                      "elem1": campos["elems"][0], "elem2": campos["elems"][1],
-                      "habs": campos["habs"], "pesos": campos["pesos"]})
+                      "objeto1": campos["objetos"][0], "objeto2": campos["objetos"][1],
+                      "habs": campos["habs"], "pesos": campos["pesos"],
+                      "cambios": list(zip(campos["posCambios"], campos["nuevosCambios"])),
+                      "ajustes": campos["ajustes"],
+                      "predisposicion": campos["predisposicion"],
+                      "probBloqueo": campos["bloqueo"][0]})
 
 
 def bits_al_azar(rng):
     return [rng.randrange(2) for _ in range(N_BITS)]
 
 
-def costo_bits(bits, n=30, semilla=0):
+def costo_bits(bits, n=m.combatesPorEquipo, semilla=0):
     return m.costo(decodificar(bits), n=n, semilla=semilla)
 
 
@@ -105,7 +116,7 @@ def mutar(bits, tasa, rng):
 
 
 def correr_ag(semilla_rng=0, popsize=30, maxit=20, tasa_sel=0.5, tasa_mut=1 / N_BITS,
-              n_elite=1, n_sim=30, semilla_sim=0, seleccion="rango", verbose=False):
+              n_elite=1, n_sim=m.combatesPorEquipo, semilla_sim=0, seleccion="rango", verbose=False):
     # Devuelve los mejores bits, su costo y la historia como pares de
     # (evaluaciones acumuladas, mejor costo hasta ahora). Todas las evaluaciones
     # usan las mismas semillas de combate, así el mismo cromosoma siempre cuesta
@@ -167,7 +178,7 @@ def correr_ag(semilla_rng=0, popsize=30, maxit=20, tasa_sel=0.5, tasa_mut=1 / N_
     return mejor_bits, mejor_costo, historia
 
 
-def correr_aleatoria(semilla_rng=0, evaluaciones=610, n_sim=30, semilla_sim=0):
+def correr_aleatoria(semilla_rng=0, evaluaciones=610, n_sim=m.combatesPorEquipo, semilla_sim=0):
     # Línea base: cromosomas al azar con el mismo presupuesto de evaluaciones.
     rng = random.Random(semilla_rng)
     mejor_bits, mejor_costo, historia = None, float("inf"), []
@@ -186,8 +197,8 @@ if __name__ == "__main__":
     t = time.time()
     bits, c, hist = correr_ag(semilla_rng=1)
     crom = decodificar(bits)
-    r = m.evaluar_jefe(crom, n=30, semilla=0)
+    r = m.evaluar_jefe(crom)
 
     print("AG: C = %.4f  F = %.4f  en %.1f s" % (c, 1 - c, time.time() - t))
-    print("mejor jefe:", crom["puntos"], m.NOMBRES_ELEM[crom["elem1"]], "->", m.NOMBRES_ELEM[crom["elem2"]])
-    print("victoria por equipo:", {k: round(v, 2) for k, v in r["p_victoria_equipos"].items()})
+    print("mejor jefe:", crom["puntos"], m.objetos[crom["objeto1"]]["nombre"], "->", m.objetos[crom["objeto2"]]["nombre"])
+    print("victoria promedio del equipo: %.2f" % r["p_victoria"])

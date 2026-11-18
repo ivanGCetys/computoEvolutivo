@@ -2,7 +2,7 @@
 # F sale de simular varios combates y medir qué tan parejo quedó el jefe.
 import math
 
-from reglas import EQUIPO_BASE, EQUIPOS
+from clases import EQUIPO_BASE, EQUIPOS
 from jefe import reparar
 from combate import simular
 
@@ -12,8 +12,14 @@ BANDAS = {"facil": (0.70, 0.90), "media": (0.40, 0.60), "dificil": (0.20, 0.40)}
 W_MARGEN, W_DURACION, W_VARIEDAD = 0.5, 0.25, 0.25
 RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 10, 3, 0.20
 
+# Con 15 equipos bajamos los combates por equipo de 30 a 10. Son 150 combates
+# por jefe en lugar de 120, casi el mismo trabajo que antes.
+combatesPorEquipo = 10
+componentes = ["fitness", "p_victoria", "f_win", "margen", "duracion", "variedad",
+               "rondas_prom", "tope_pct"]
 
-def evaluar(crom, equipo=EQUIPO_BASE, n=30, semilla=0, banda=BANDAS["media"]):
+
+def evaluar(crom, equipo=EQUIPO_BASE, n=combatesPorEquipo, semilla=0, banda=BANDAS["media"]):
     # Todos los individuos de una generación deben usar la misma semilla, si no
     # se estarían comparando combates distintos.
     crom = reparar(crom)
@@ -21,22 +27,21 @@ def evaluar(crom, equipo=EQUIPO_BASE, n=30, semilla=0, banda=BANDAS["media"]):
     return calcular_fitness(resultados, banda)
 
 
-def evaluar_jefe(crom, n=30, semilla=0, banda=BANDAS["media"]):
-    # El jugador elige equipo al empezar, así que el jefe se queda con la nota
-    # de su peor equipo. Con el promedio, un jefe que abusa de un reparto de
-    # elementos se salvaría con los otros tres.
+def evaluar_jefe(crom, n=combatesPorEquipo, semilla=0, banda=BANDAS["media"]):
+    # El jugador arma su equipo con 4 de las 6 clases. Al jefe se le califica
+    # con el promedio sobre los 15 equipos posibles: con tantos equipos, quedarse
+    # con el peor castigaba a jefes buenos por una sola combinación rara.
     crom = reparar(crom)
     f = {k: evaluar(crom, eq, n, semilla, banda) for k, eq in EQUIPOS.items()}
-    peor = min(f, key=lambda k: f[k]["fitness"])
 
-    r = dict(f[peor])
-    r["peor_equipo"] = peor
+    r = {c: sum(f[k][c] for k in f) / len(f) for c in componentes}
+    r["peor_equipo"] = min(f, key=lambda k: f[k]["fitness"])
     r["fitness_equipos"] = {k: f[k]["fitness"] for k in EQUIPOS}
     r["p_victoria_equipos"] = {k: f[k]["p_victoria"] for k in EQUIPOS}
     return r
 
 
-def costo(crom, n=30, semilla=0, banda=BANDAS["media"]):
+def costo(crom, n=combatesPorEquipo, semilla=0, banda=BANDAS["media"]):
     return 1.0 - evaluar_jefe(crom, n, semilla, banda)["fitness"]
 
 
@@ -54,12 +59,13 @@ def calcular_fitness(resultados, banda=BANDAS["media"]):
               if victorias else 0.0)
     duracion = sum(math.exp(-(r["rondas"] - RONDAS_IDEAL) ** 2 / (2 * SIGMA_RONDAS ** 2)) for r in resultados) / n
 
-    usos = [sum(r["usos"][k] for r in resultados) for k in range(4)]
+    nUsos = len(resultados[0]["usos"])
+    usos = [sum(r["usos"][k] for r in resultados) for k in range(nUsos)]
     total = sum(usos)
     H = -sum(u / total * math.log2(u / total) for u in usos if u > 0)
 
-    # Con 4 habilidades la entropía máxima es log2(4) = 2 bits.
-    variedad = H / 2.0
+    # La entropía se divide entre su máximo, que es log2 del número de ataques.
+    variedad = H / math.log2(nUsos)
 
     fitness = f_win * (W_MARGEN * margen + W_DURACION * duracion + W_VARIEDAD * variedad)
     return {"fitness": fitness, "p_victoria": p, "f_win": f_win, "margen": margen,

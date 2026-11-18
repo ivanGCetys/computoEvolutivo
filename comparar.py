@@ -6,13 +6,14 @@
 import csv
 import statistics as st
 import time
+from multiprocessing import Pool
 import motor as m
 import genetico as g
 
 REPETICIONES = 10
 POPSIZE, MAXIT, N_ELITE = 30, 20, 1
 EVALS = POPSIZE + MAXIT * (POPSIZE - N_ELITE)
-N_SIM = 30
+N_SIM = m.combatesPorEquipo
 
 # Se optimiza con unas semillas de combate y se revalida con otras que el
 # algoritmo nunca vio.
@@ -37,30 +38,35 @@ def revalidar(bits):
     return m.evaluar_jefe(g.decodificar(bits), n=N_SIM, semilla=SEMILLA_PRUEBA)["fitness"]
 
 
+def unaCorrida(tarea):
+    metodo, rep = tarea
+    t = time.time()
+    if metodo == "aleatoria":
+        bits, c, hist = g.correr_aleatoria(semilla_rng=100 + rep, evaluaciones=EVALS,
+                                           n_sim=N_SIM, semilla_sim=SEMILLA_BUSQUEDA)
+    else:
+        bits, c, hist = g.correr_ag(semilla_rng=100 + rep, popsize=POPSIZE, maxit=MAXIT,
+                                    n_elite=N_ELITE, n_sim=N_SIM,
+                                    semilla_sim=SEMILLA_BUSQUEDA, seleccion=metodo)
+    return 1 - c, revalidar(bits), curva_en_rejilla(hist), time.time() - t
+
+
 def correr_todo():
+    # Las corridas son independientes entre sí, así que se reparten entre los
+    # núcleos de la máquina. Cada una lleva su propia semilla y el resultado no
+    # depende de en qué orden terminen.
     datos = {}
-    for metodo in METODOS + ["aleatoria"]:
-        finales, revalidados, curvas, segundos = [], [], [], []
+    with Pool() as pool:
+        for metodo in METODOS + ["aleatoria"]:
+            corridas = pool.map(unaCorrida, [(metodo, rep) for rep in range(REPETICIONES)])
+            finales = [c[0] for c in corridas]
+            revalidados = [c[1] for c in corridas]
 
-        for rep in range(REPETICIONES):
-            t = time.time()
-            if metodo == "aleatoria":
-                bits, c, hist = g.correr_aleatoria(semilla_rng=100 + rep, evaluaciones=EVALS,
-                                                   n_sim=N_SIM, semilla_sim=SEMILLA_BUSQUEDA)
-            else:
-                bits, c, hist = g.correr_ag(semilla_rng=100 + rep, popsize=POPSIZE, maxit=MAXIT,
-                                            n_elite=N_ELITE, n_sim=N_SIM,
-                                            semilla_sim=SEMILLA_BUSQUEDA, seleccion=metodo)
-            finales.append(1 - c)
-            revalidados.append(revalidar(bits))
-            curvas.append(curva_en_rejilla(hist))
-            segundos.append(time.time() - t)
-
-        datos[metodo] = {"fitness": finales, "revalidado": revalidados,
-                         "curva": [st.mean(col) for col in zip(*curvas)],
-                         "segundos": st.mean(segundos)}
-        print("%-10s F = %.4f +- %.4f  (revalidado %.4f)"
-              % (metodo, st.mean(finales), st.pstdev(finales), st.mean(revalidados)))
+            datos[metodo] = {"fitness": finales, "revalidado": revalidados,
+                             "curva": [st.mean(col) for col in zip(*(c[2] for c in corridas))],
+                             "segundos": st.mean(c[3] for c in corridas)}
+            print("%-10s F = %.4f +- %.4f  (revalidado %.4f)"
+                  % (metodo, st.mean(finales), st.pstdev(finales), st.mean(revalidados)))
     return datos
 
 
@@ -75,12 +81,12 @@ def guardar(datos):
     with open("resultados.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["metodo", "fitness_medio", "desv", "fitness_min", "fitness_max",
-                    "revalidado_medio", "evals_para_F0.70", "evals_para_F0.80", "seg_por_corrida"])
+                    "revalidado_medio", "evals_para_F0.60", "evals_para_F0.70", "seg_por_corrida"])
         for k, d in datos.items():
             w.writerow([k, round(st.mean(d["fitness"]), 4), round(st.pstdev(d["fitness"]), 4),
                         round(min(d["fitness"]), 4), round(max(d["fitness"]), 4),
                         round(st.mean(d["revalidado"]), 4),
-                        evals_para_llegar(d["curva"], 0.70), evals_para_llegar(d["curva"], 0.80),
+                        evals_para_llegar(d["curva"], 0.60), evals_para_llegar(d["curva"], 0.70),
                         round(d["segundos"], 1)])
 
     # El backend Agg dibuja directo a archivo, sin abrir ventana, para que el

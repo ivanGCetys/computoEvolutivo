@@ -1,22 +1,79 @@
-# Reglas base del juego: elementos, fórmula de daño y el equipo del jugador.
-# Aquí no hay azar ni estado, solo tablas y cuentas.
+# Reglas base del juego: elementos, objetos equipables y las cuentas de daño.
+# Aquí no hay estado de combate, solo tablas y fórmulas.
 
-FUEGO, HIELO, VIENTO, TIERRA = 0, 1, 2, 3
-NOMBRES_ELEM = ["fuego", "hielo", "viento", "tierra"]
+NOMBRES_ELEM = ["fuego", "agua", "viento", "tierra", "planta", "rayo", "luz", "oscuridad"]
 N_ELEMENTOS = len(NOMBRES_ELEM)
+FUEGO, VIENTO, TIERRA = 0, 2, 3
+indiceElem = {nombre: i for i, nombre in enumerate(NOMBRES_ELEM)}
 
-# El ciclo es fuego, hielo, viento, tierra y de vuelta a fuego: cada uno vence al siguiente.
-VENCE = {FUEGO: HIELO, HIELO: VIENTO, VIENTO: TIERRA, TIERRA: FUEGO}
+# Los elementos ya no forman un ciclo. Un elemento es solo la etiqueta de un
+# ataque y lo único que hace es activar los bonos de los objetos equipados.
+# Van en pares de opuestos (fuego y agua, viento y tierra, planta y rayo, luz
+# y oscuridad) y por cómo está ordenada la lista el opuesto es el vecino del par.
 
 
-def mult_elemental(elem_ataque, elem_defensor):
-    if elem_ataque is None:
-        return 1.0
-    if VENCE[elem_ataque] == elem_defensor:
-        return 1.5
-    if VENCE[elem_defensor] == elem_ataque:
-        return 0.5
-    return 1.0
+def elemOpuesto(elem):
+    return elem ^ 1
+
+
+def crearObjetos():
+    # Dos objetos por elemento. El amuleto pega más fuerte con su elemento y lo
+    # paga con una debilidad grande al opuesto. El talismán es la versión
+    # defensiva: menos bono de ataque, resiste al opuesto y cede ante otro.
+    lista = []
+    for e, nombre in enumerate(NOMBRES_ELEM):
+        amuleto = {"nombre": "Amuleto de " + nombre, "elem": e,
+                   "bonoAtaque": {e: 0.20},
+                   "bonoDefensa": {e: 0.10, elemOpuesto(e): -0.25}}
+        talisman = {"nombre": "Talisman de " + nombre, "elem": e,
+                    "bonoAtaque": {e: 0.10},
+                    "bonoDefensa": {elemOpuesto(e): 0.25, (e + 2) % N_ELEMENTOS: -0.15}}
+        lista.append(amuleto)
+        lista.append(talisman)
+
+    # Los multiplicadores se dejan ya calculados por elemento porque el combate
+    # los consulta en cada golpe.
+    for obj in lista:
+        obj["multAtk"] = [1.0 + obj["bonoAtaque"].get(e, 0.0) for e in range(N_ELEMENTOS)]
+        obj["multDef"] = [1.0 + obj["bonoDefensa"].get(e, 0.0) for e in range(N_ELEMENTOS)]
+    return lista
+
+
+objetos = crearObjetos()
+nObjetos = len(objetos)
+
+
+def describirObjeto(obj):
+    partes = []
+    for e, bono in obj["bonoAtaque"].items():
+        partes.append("%+d%% ataque de %s" % (round(100 * bono), NOMBRES_ELEM[e]))
+    for e, bono in obj["bonoDefensa"].items():
+        partes.append("%+d%% defensa contra %s" % (round(100 * bono), NOMBRES_ELEM[e]))
+    return ", ".join(partes)
+
+
+# Los ataques físicos varían más y pueden salir críticos. Los mágicos son más
+# parejos, no tienen crítico y lo compensan con más poder base.
+variacionFisMin, variacionFisMax = 0.80, 1.20
+variacionMagMin, variacionMagMax = 0.85, 1.00
+multCritico = 1.60
+probCriticoBase = 0.10
+probCriticoJefe = 0.04
+
+# El esquive solo existe para el que es más rápido que su atacante y crece con
+# la diferencia de velocidad, entre 1% y 15%.
+esquiveMin, esquiveMax = 0.01, 0.15
+esquivePorPunto = 0.005
+
+multBloqueo = 0.5
+PODER_BASICO = 0.8
+
+# Mochila compartida del equipo. Cada poción devuelve una fracción del máximo
+# de quien la bebe.
+pocionesIniciales = {"hpChica": 2, "hpGrande": 1, "spChica": 2, "spGrande": 1}
+efectoPocion = {"hpChica": 0.30, "hpGrande": 0.60, "spChica": 0.30, "spGrande": 0.60}
+nombrePocion = {"hpChica": "pocion de vida", "hpGrande": "pocion grande de vida",
+                "spChica": "pocion de mana", "spGrande": "pocion grande de mana"}
 
 
 def calcular_dano(atk, poder, mult_elem, defensa, mult_bloqueo=1.0):
@@ -27,40 +84,31 @@ def calcular_dano(atk, poder, mult_elem, defensa, mult_bloqueo=1.0):
     return max(1, int(bruto + 1e-9))
 
 
-# Los héroes se llaman por su rol y no por su elemento, porque el elemento
-# cambia según el equipo y los stats no.
-EQUIPO_BASE = [
-    {"nombre": "Guerrero", "elem": FUEGO, "hp": 260, "sp": 60, "atk": 60, "defe": 25, "vel": 20, "cura": False, "bloqueo": 0.5},
-    {"nombre": "Curandero", "elem": HIELO, "hp": 240, "sp": 120, "atk": 40, "defe": 30, "vel": 15, "cura": True, "bloqueo": 0.5},
-    {"nombre": "Explorador", "elem": VIENTO, "hp": 250, "sp": 80, "atk": 50, "defe": 25, "vel": 30, "cura": False, "bloqueo": 0.5},
-    {"nombre": "Tanque", "elem": TIERRA, "hp": 380, "sp": 40, "atk": 35, "defe": 60, "vel": 10, "cura": False, "bloqueo": 0.3},
-]
-
-PODER_BASICO = 0.8
-PODER_MAGIA, COSTO_MAGIA = 1.2, 15
-
-# El ataque fuerte se paga con vida: 20% del HP máximo de quien lo usa.
-PODER_FUERTE, COSTO_FUERTE = 1.6, 0.20
-
-CURA, COSTO_CURA = 0.25, 20
-POCION_HP, POCIONES_INICIALES = 0.40, 3
-UMBRAL_POCION, UMBRAL_CURA, UMBRAL_FUERTE = 0.30, 0.40, 0.50
+def probEsquive(velAtacante, velDefensor):
+    dif = velDefensor - velAtacante
+    return min(esquiveMax, max(esquiveMin, dif * esquivePorPunto))
 
 
-def _rotar_equipo(k):
-    eq = [dict(p) for p in EQUIPO_BASE]
-    for p in eq:
-        p["elem"] = (p["elem"] + k) % N_ELEMENTOS
-    return eq
+def multVariacion(rng, esFisico, minFis=variacionFisMin, probCritico=probCriticoBase):
+    if not esFisico:
+        return variacionMagMin + (variacionMagMax - variacionMagMin) * rng.random(), False
+
+    if rng.random() < probCritico:
+        return multCritico, True
+    return minFis + (variacionFisMax - minFis) * rng.random(), False
 
 
-# Los cuatro equipos son el mismo equipo con los elementos corridos un lugar
-# cada vez. Mismos stats y mismo HP total, así la comparación entre equipos
-# solo mide el efecto del reparto de elementos.
-NOMBRES_EQUIPOS = ["A", "B", "C", "D"]
-EQUIPOS = {NOMBRES_EQUIPOS[k]: (EQUIPO_BASE if k == 0 else _rotar_equipo(k))
-           for k in range(N_ELEMENTOS)}
-EQUIPO_A, EQUIPO_B, EQUIPO_C, EQUIPO_D = (EQUIPOS[n] for n in NOMBRES_EQUIPOS)
+def danoAtaque(rng, atk, poder, esFisico, elem, objAtacante, defensa, objDefensor,
+               velAtacante, velDefensor, bloqueo=1.0, minFis=variacionFisMin,
+               probCritico=probCriticoBase):
+    # Devuelve el daño y una nota que dice si fue esquive o crítico. El esquive
+    # se tira primero porque un golpe esquivado no necesita más cuentas.
+    if rng.random() < probEsquive(velAtacante, velDefensor):
+        return 0, "esquiva"
 
-# Nombre anterior del equipo C, lo dejamos para no romper scripts viejos.
-EQUIPO_ROTADO = EQUIPO_C
+    mult, critico = multVariacion(rng, esFisico, minFis, probCritico)
+    if elem is not None:
+        mult *= objAtacante["multAtk"][elem]
+        defensa = defensa * objDefensor["multDef"][elem]
+
+    return calcular_dano(atk, poder, mult, defensa, bloqueo), ("critico" if critico else "")
