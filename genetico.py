@@ -116,11 +116,17 @@ def mutar(bits, tasa, rng):
 
 
 def correr_ag(semilla_rng=0, popsize=30, maxit=20, tasa_sel=0.5, tasa_mut=1 / N_BITS,
-              n_elite=1, n_sim=m.combatesPorEquipo, semilla_sim=0, seleccion="rango", verbose=False):
+              n_elite=1, n_sim=m.combatesPorEquipo, semilla_sim=0, seleccion="rango", verbose=False,
+              rotarSemillas=False):
     # Devuelve los mejores bits, su costo y la historia como pares de
-    # (evaluaciones acumuladas, mejor costo hasta ahora). Todas las evaluaciones
-    # usan las mismas semillas de combate, así el mismo cromosoma siempre cuesta
-    # lo mismo y la curva no se mueve por azar.
+    # (evaluaciones acumuladas, mejor costo hasta ahora). Por defecto todas las
+    # evaluaciones usan las mismas semillas de combate, así el mismo cromosoma
+    # siempre cuesta lo mismo y la curva no se mueve por azar.
+    #
+    # Con rotarSemillas cada generación pelea combates distintos y toda la
+    # población se vuelve a evaluar, la élite incluida. Así nadie sobrevive por
+    # haber tenido suerte con unos combates en particular, pero el mejor costo
+    # ya no es monótono y lo que se devuelve es el mejor de la última generación.
     rng = random.Random(semilla_rng)
     n_keep = int(popsize * tasa_sel)
     acum = acumuladas(probabilidades_rango(n_keep))
@@ -163,12 +169,16 @@ def correr_ag(semilla_rng=0, popsize=30, maxit=20, tasa_sel=0.5, tasa_mut=1 / N_
         hijos = [mutar(b, tasa_mut, rng)[0] for b in hijos]
         pob = sobrevivientes + hijos
 
-        nuevos = costos[:n_elite] + [costo_bits(b, n_sim, semilla_sim) for b in pob[n_elite:]]
-        costos = nuevos
-        evals += len(pob) - n_elite
+        if rotarSemillas:
+            semillaGen = semilla_sim + (gen + 1) * n_sim
+            costos = [costo_bits(b, n_sim, semillaGen) for b in pob]
+            evals += len(pob)
+        else:
+            costos = costos[:n_elite] + [costo_bits(b, n_sim, semilla_sim) for b in pob[n_elite:]]
+            evals += len(pob) - n_elite
 
         i = min(range(len(pob)), key=lambda k: costos[k])
-        if costos[i] < mejor_costo:
+        if rotarSemillas or costos[i] < mejor_costo:
             mejor_bits, mejor_costo = list(pob[i]), costos[i]
         historia.append((evals, mejor_costo))
 

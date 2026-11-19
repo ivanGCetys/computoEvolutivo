@@ -15,8 +15,9 @@ RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 10, 3, 0.20
 # Con 15 equipos bajamos los combates por equipo de 30 a 10. Son 150 combates
 # por jefe en lugar de 120, casi el mismo trabajo que antes.
 combatesPorEquipo = 10
+toleranciaBanda = 0.10
 componentes = ["fitness", "p_victoria", "f_win", "margen", "duracion", "variedad",
-               "rondas_prom", "tope_pct"]
+               "desbalance", "rondas_prom", "tope_pct"]
 
 
 def evaluar(crom, equipo=EQUIPO_BASE, n=combatesPorEquipo, semilla=0, banda=BANDAS["media"]):
@@ -45,6 +46,28 @@ def costo(crom, n=combatesPorEquipo, semilla=0, banda=BANDAS["media"]):
     return 1.0 - evaluar_jefe(crom, n, semilla, banda)["fitness"]
 
 
+def objetivos(crom, n=combatesPorEquipo, semilla=0):
+    # Los tres objetivos que minimiza NSGA-II. Son los ingredientes de F, pero
+    # separados para que el algoritmo no tenga que aceptar los pesos que
+    # nosotros escogimos al sumarlos:
+    #   desbalance   qué tan lejos queda la tasa de victoria de 50%
+    #   holgura      el equipo gana con mucha más vida que el 20% ideal
+    #   desajuste    los combates duran mucho más o mucho menos de 10 rondas
+    # La variedad se queda fuera. Desde que el jefe ataca con una cola, casi
+    # cualquier jefe la tiene arriba de 0.9 y como objetivo solo llenaba el
+    # frente de jefes malos que ganaban una centésima de variedad.
+    #
+    # Junto con los objetivos se devuelve la violación de la restricción: un
+    # jefe solo cuenta como aceptable si, en promedio, la tasa de victoria de
+    # los equipos queda a no más de toleranciaBanda de la banda 40-60%. Sin
+    # esto el frente se llenaba de jefes con la duración perfecta que ningún
+    # equipo podía vencer.
+    r = evaluar_jefe(crom, n, semilla)
+    distanciaBanda = (1 - r["f_win"]) / 2
+    violacion = max(0.0, distanciaBanda - toleranciaBanda)
+    return (r["desbalance"], 1 - r["margen"], 1 - r["duracion"]), violacion
+
+
 def calcular_fitness(resultados, banda=BANDAS["media"]):
     # Está separada de evaluar para poder probarla a mano con resultados inventados.
     n = len(resultados)
@@ -69,6 +92,6 @@ def calcular_fitness(resultados, banda=BANDAS["media"]):
 
     fitness = f_win * (W_MARGEN * margen + W_DURACION * duracion + W_VARIEDAD * variedad)
     return {"fitness": fitness, "p_victoria": p, "f_win": f_win, "margen": margen,
-            "duracion": duracion, "variedad": variedad,
+            "duracion": duracion, "variedad": variedad, "desbalance": 2 * abs(p - 0.5),
             "rondas_prom": sum(r["rondas"] for r in resultados) / n,
             "tope_pct": sum(r["tope"] for r in resultados) / n}

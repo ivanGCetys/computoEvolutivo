@@ -1,6 +1,6 @@
 # Jefe RPG evolutivo
 
-Un algoritmo genético binario que diseña jefes para un RPG por turnos. Un motor de combate enfrenta a cada jefe contra los 15 equipos que puede armar el jugador, y el algoritmo busca el jefe que da el combate más parejo: que el equipo gane entre 40% y 60% de las veces, en unas 10 rondas, y termine con poca vida.
+Dos algoritmos evolutivos que diseñan jefes para un RPG por turnos: un algoritmo genético binario de un solo objetivo y NSGA-II, su versión multiobjetivo. Un motor de combate enfrenta a cada jefe contra los 15 equipos que puede armar el jugador, y los algoritmos buscan el jefe que da el combate más parejo: que el equipo gane entre 40% y 60% de las veces, en unas 10 rondas, y termine con poca vida.
 
 Proyecto final de Cómputo Evolutivo, CETYS Universidad.
 
@@ -37,11 +37,12 @@ Los comandos van en la terminal. Todo usa semillas fijas, así que los números 
 
 | Paso | Comando | Qué debe salir | Tiempo |
 |---|---|---|---|
-| 1 | `python -m pytest -q` | 50 passed | 2 s |
+| 1 | `python -m pytest -q` | 63 passed | 5 s |
 | 2 | `python genetico.py` | Termina con F = 0.7491 | 30 s |
-| 3 | `python narrar.py resumen` | Un combate, una línea por ronda | 1 s |
-| 4 | `python jugar.py` | Juegas tú contra el mejor jefe | lo que dure la partida |
-| 5 | `python comparar.py` | convergencia.png y resultados.csv | 10 min |
+| 3 | `python nsga2.py` | Un frente de 9 jefes con hipervolumen 0.2734 | 30 s |
+| 4 | `python narrar.py resumen` | Un combate, una línea por ronda | 1 s |
+| 5 | `python jugar.py` | Juegas tú contra el mejor jefe | lo que dure la partida |
+| 6 | `python comparar.py` | convergencia.png y resultados.csv | 10 min |
 
 Si el paso 1 falla, no sigas: algo está roto.
 
@@ -91,11 +92,12 @@ Al equipo lo controla un jugador automático durante la evaluación (`heuristico
 | `combate.py` | Simulación de un combate |
 | `aptitud.py` | Función objetivo F y función de costo C = 1 − F |
 | `genetico.py` | Algoritmo genético binario (rango, costo o torneo; cruce de un punto; mutación; elitismo) y búsqueda aleatoria |
+| `nsga2.py` | NSGA-II: ordenamiento no dominado, distancia de crowding, torneo binario, restricción e hipervolumen |
 | `comparar.py` | Algoritmo genético contra búsqueda aleatoria, 10 repeticiones, mismo presupuesto |
 | `narrar.py` | Cuenta un combate turno por turno |
 | `jugar.py` | Modo interactivo en la terminal |
 | `calibrar.py` | Histograma de la tasa de victoria de jefes aleatorios |
-| `test_motor.py`, `test_genetico.py` | Pruebas con los valores esperados calculados a mano |
+| `test_motor.py`, `test_genetico.py`, `test_nsga2.py` | Pruebas con los valores esperados calculados a mano |
 | `mejor_jefe.json` | El mejor jefe de una corrida; si lo borras, se vuelve a crear |
 
 ## Cromosoma
@@ -129,7 +131,27 @@ C = 1 − F        (el algoritmo minimiza C)
 
 Cada jefe pelea 10 combates contra cada uno de los 15 equipos (150 en total) y su F es el promedio de los 15.
 
-## Resultados
+## NSGA-II
+
+F junta tres medidas en un solo número con pesos que escogimos a mano. NSGA-II trabaja con las medidas por separado y entrega un frente de Pareto: un conjunto de jefes donde ninguno es mejor que otro en todo.
+
+Objetivos, los tres a minimizar:
+
+| Objetivo | Qué mide |
+|---|---|
+| Desbalance | Qué tan lejos queda la tasa de victoria de cada equipo de 50% |
+| Holgura | El equipo gana con mucha más vida que el 20% ideal (1 − margen) |
+| Desajuste de duración | Los combates duran mucho más o mucho menos de 10 rondas (1 − duración) |
+
+La variedad no entra como objetivo. Desde que el jefe ataca con una cola, casi cualquier jefe la tiene arriba de 0.9, y como objetivo solo llenaba el frente de jefes malos que ganaban una centésima de variedad.
+
+Restricción: un jefe solo es aceptable si, en promedio, la tasa de victoria de los equipos queda a no más de 0.10 de la banda 40–60%. Se usa dominancia con restricciones: el que cumple le gana al que no, y entre dos que no cumplen gana el que viola menos. Sin la restricción el frente se llenaba de jefes con la duración perfecta que ningún equipo podía vencer.
+
+El cromosoma, el cruce de un punto y la mutación son los mismos del algoritmo genético. Cambia la selección: ordenamiento no dominado, distancia de crowding y torneo binario, y los sobrevivientes se escogen entre padres e hijos juntos.
+
+**Semillas rotativas.** Para atacar el sobreajuste, cada generación pelea combates distintos y los padres se vuelven a evaluar junto con sus hijos. Cuesta el doble de evaluaciones por generación. El algoritmo genético de un solo objetivo también lo puede usar, con `rotarSemillas=True`.
+
+## Resultados del algoritmo genético
 
 10 repeticiones por método, 610 evaluaciones cada una:
 

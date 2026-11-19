@@ -147,3 +147,13 @@ def test_reproducible():
     a = g.correr_ag(semilla_rng=5, popsize=8, maxit=3, n_sim=2)[1]
     b = g.correr_ag(semilla_rng=5, popsize=8, maxit=3, n_sim=2)[1]
     assert a == b
+
+
+# 7. Semillas rotativas
+def testRotarSemillasEvaluaATodaLaPoblacion():
+    # popsize 10, maxit 4: con rotación la élite también se vuelve a evaluar
+    # -> 10 + 4x10 = 50 evaluaciones en lugar de 46
+    _, _, hist = g.correr_ag(semilla_rng=3, popsize=10, maxit=4, n_sim=2, rotarSemillas=True)
+    assert hist[-1][0] == 10 + 4 * 10
+    a = g.correr_ag(semilla_rng=3, popsize=10, maxit=4, n_sim=2, rotarSemillas=True)[1]
+    assert a == hist[-1][1]
