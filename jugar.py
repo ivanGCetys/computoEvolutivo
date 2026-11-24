@@ -1,4 +1,4 @@
-# Modo interactivo: tú controlas al equipo contra el jefe que diseñó el algoritmo.
+# Modo interactivo: tú controlas al equipo contra un jefe del frente de NSGA-II.
 # Usa el mismo motor y las mismas reglas con las que se evaluó al jefe, solo
 # cambia quién elige las acciones del equipo.
 #
@@ -223,12 +223,33 @@ def jugar(crom, clave_equipo=None, semilla=None, pausa=PAUSA, objetosElegidos=No
     return res
 
 
+def elegirJefe():
+    # NSGA-II no entrega un jefe sino un frente. Aquí se ofrecen el que eligió
+    # el algoritmo y el mejor en cada objetivo, para que se note la diferencia
+    # entre ellos al jugar.
+    frente = narrar.cargarOCrearFrente()
+    candidatos = [("El que eligió el algoritmo", next(j for j in frente if j["elegido"])),
+                  ("El más parejo", min(frente, key=lambda j: j["objetivos"][0])),
+                  ("El de final más cerrado", min(frente, key=lambda j: j["objetivos"][1])),
+                  ("El de duración más cercana a 10 rondas", min(frente, key=lambda j: j["objetivos"][2]))]
+
+    opciones = []
+    for titulo, jefe in candidatos:
+        if all(jefe is not otro for _, otro in opciones):
+            opciones.append((titulo, jefe))
+
+    print("\nElige al jefe. Todos vienen del mismo frente de Pareto, de %d jefes:" % len(frente))
+    for n, (titulo, jefe) in enumerate(opciones, start=1):
+        print("  %d) %-40s desbalance %.2f, holgura %.2f, desajuste de duración %.2f"
+              % ((n, titulo) + tuple(jefe["objetivos"])))
+    return opciones[leerNumero(len(opciones), "  > ") - 1][1]["crom"]
+
+
 if __name__ == "__main__":
     pausa = 0 if "rapido" in sys.argv else PAUSA
-    crom = narrar.cargar_o_crear_mejor()
+    crom = elegirJefe()
     pred = m.evaluar_jefe(crom)
 
-    print("\nEste jefe lo diseñó el algoritmo (F = %.4f)." % pred["fitness"])
-    print("Contra el jugador automático el equipo gana %.0f%% de las veces, en promedio de los 15 equipos."
-          % (100 * pred["p_victoria"]))
+    print("\nContra el jugador automático el equipo le gana %.0f%% de las veces, en promedio de los 15 equipos (F = %.4f)."
+          % (100 * pred["p_victoria"], pred["fitness"]))
     jugar(crom, pausa=pausa)

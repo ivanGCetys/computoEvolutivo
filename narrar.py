@@ -9,6 +9,7 @@ import sys
 import motor as m
 
 ARCHIVO_JEFE = "mejor_jefe.json"
+ARCHIVO_FRENTE = "frente.json"
 
 notasGolpe = {"critico": " (critico)", "esquiva": " esquiva", "bloqueado": " lo bloquea por completo"}
 
@@ -106,6 +107,27 @@ def narrar(crom, equipo=m.EQUIPO_BASE, semilla=0, detalle=True):
     return "\n".join(texto), res
 
 
+def cargarOCrearFrente():
+    # El frente de Pareto de una corrida de NSGA-II, como lista de jefes con sus
+    # tres objetivos. Uno de ellos va marcado como el elegido. Si el archivo no
+    # existe se corre el algoritmo una vez, con la semilla de siempre para que
+    # el frente sea reproducible y con el presupuesto largo de comparar.py, que
+    # es con el que NSGA-II le saca ventaja a la búsqueda aleatoria.
+    if os.path.exists(ARCHIVO_FRENTE):
+        with open(ARCHIVO_FRENTE) as f:
+            return json.load(f)
+
+    import genetico as g
+    import nsga2
+    frente, _ = nsga2.correrNsga2(semillaRng=1, generaciones=30)
+    elegido = nsga2.elegirDelFrente(frente)
+    jefes = [{"crom": g.decodificar(bits), "objetivos": list(objs), "elegido": bits is elegido[0]}
+             for bits, objs, _ in frente]
+    with open(ARCHIVO_FRENTE, "w") as f:
+        json.dump(jefes, f, indent=1)
+    return jefes
+
+
 def cargar_o_crear_mejor():
     # Un archivo guardado con el formato de una versión anterior del juego no
     # sirve, así que se trata igual que si no existiera.
@@ -115,12 +137,8 @@ def cargar_o_crear_mejor():
         if "predisposicion" in crom:
             return crom
 
-    # Se corre el algoritmo una vez, con la misma semilla de siempre para que
-    # el jefe sea reproducible.
-    import genetico as g
-    bits, c, _ = g.correr_ag(semilla_rng=1, verbose=False)
-    crom = g.decodificar(bits)
-    crom["_fitness"] = 1 - c
+    crom = dict(next(j["crom"] for j in cargarOCrearFrente() if j["elegido"]))
+    crom["_fitness"] = m.evaluar_jefe(crom)["fitness"]
     with open(ARCHIVO_JEFE, "w") as f:
         json.dump(crom, f, indent=2)
     return crom

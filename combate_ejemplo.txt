@@ -1,86 +1,72 @@
-Tasa de victoria del equipo, promedio de los 15 equipos: 0.47
+Tasa de victoria del equipo, promedio de los 15 equipos: 0.51
 
-Jefe con Talisman de planta, cambia a Talisman de rayo al bajar de 50% de vida
-  Vida 777   Ataque 90   Defensa 122   Ataque magico 287   Defensa magica 90   Velocidad 22.2
-  Cola de ataques: Llamarada, Garra sombria, Avalancha, Incendio, Marejada, Aplastamiento, Zarpazo, Chorro
+Jefe con Talisman de planta, cambia a Talisman de fuego al bajar de 50% de vida
+  Vida 591   Ataque 90   Defensa 120   Ataque magico 292   Defensa magica 91   Velocidad 27.3
+  Cola de ataques: Llamarada, Garra sombria, Cataclismo, Incendio, Devastacion, Aplastamiento, Avalancha, Zarpazo
 Equipo: Guerrero 300   Tanque 480   Mago 210   Clerigo 300
   Conjuros de Guerrero: Guardia de acero, Tajo elemental, Tajo mayor
   Conjuros de Mago: Llama, Remolino, Zarza, Juicio
-Orden de turnos: Guerrero, Mago, Clerigo, Jefe, Tanque
+Orden de turnos: Jefe, Guerrero, Mago, Clerigo, Tanque
 
-Ronda 1   jefe 777/777   equipo 1290/1290
-  Guerrero   Tajo mayor de luz                  Jefe -40
-  Mago       Juicio de luz                      Jefe -125
-  Clerigo    Ataque basico                      Jefe -12
-  Jefe       Incendio de fuego                  Guerrero -130, Tanque -113, Mago -128, Clerigo -128
+Ronda 1   jefe 591/591   equipo 1290/1290
+  Jefe       Garra sombria de oscuridad         Clerigo -227
+  Guerrero   Tajo mayor de luz                  Jefe -38
+  Mago       Juicio de luz                      Jefe -140
+  Clerigo    Bebe pocion de vida                Clerigo +90
+  Tanque     Ataque basico                      Jefe -11
+
+Ronda 2   jefe 402/591   equipo 1153/1290
+  Jefe       Bloquea
+  Guerrero   Tajo mayor de luz                  Jefe -19
+  Mago       Llama de fuego                     Jefe -38
+  Clerigo    Curacion menor                     Clerigo +48
+  Tanque     Ataque basico                      Jefe -5
+
+Ronda 3   jefe 340/591   equipo 1201/1290
+  Jefe       Llamarada de fuego                 Mago -281
+      Mago cae
+  Guerrero   Tajo elemental de oscuridad        Jefe -28
+  Clerigo    Ataque basico                      Jefe -23 (critico)
+  Tanque     Ataque basico                      Jefe -12
+
+Ronda 4   jefe 277/591   equipo 991/1290
+  Fase 2: el jefe cambia a Talisman de fuego y aprende Rayo final y Embestida (vida 277, menos de la mitad)
+    Vida 591   Ataque 85   Defensa 114   Ataque magico 277   Defensa magica 77   Velocidad 25.9
+  Jefe       Carga Devastacion
+  Guerrero   Ataque basico                      Jefe -20
+  Clerigo    Ataque basico                      Jefe -23 (critico)
+  Tanque     Bloqueo total
+
+Ronda 5   jefe 234/591   equipo 991/1290
+  Jefe       Devastacion                        Guerrero -85, Tanque lo bloquea por completo, Clerigo -64
+  Guerrero   Ataque basico                      Jefe -22
+  Clerigo    Curacion menor                     Clerigo +48
   Tanque     Ataque basico                      Jefe -10
 
-Ronda 2   jefe 590/777   equipo 791/1290
-  Guerrero   Guardia de acero
-  Mago       Llama de fuego                     Jefe -75
-  Clerigo    Curacion menor                     Mago +48
-  Jefe       Garra sombria de oscuridad         Tanque -257
-  Tanque     Bebe pocion de vida                Tanque +144
+Ronda 6   jefe 202/591   equipo 890/1290
+  Jefe       Bloquea
+  Guerrero   Ataque basico                      Jefe -8
+  Clerigo    Ataque basico                      Jefe -6
+  Tanque     Ataque basico                      Jefe -5
 
-Ronda 3   jefe 515/777   equipo 726/1290
-  Guerrero   Tajo mayor de luz                  Jefe -39
-  Mago       Llama de fuego                     Jefe -81
-  Clerigo    Curacion menor                     Tanque +48
-  Jefe       Marejada de agua                   Guerrero -132, Tanque -125, Mago -128, Clerigo -121
-  Tanque     Muralla
+Ronda 7   jefe 183/591   equipo 890/1290
+  Jefe       Carga Cataclismo
+  Guerrero   Ataque basico                      Jefe -29 (critico)
+  Clerigo    Ataque basico                      Jefe -12
+  Tanque     Bloqueo total
 
-Ronda 4   jefe 395/777   equipo 268/1290
-  Guerrero   Bebe pocion grande de vida         Guerrero +180
-  Mago       Bebe pocion de vida                Mago +63
-  Clerigo    Curacion en grupo                  Guerrero +36, Tanque +36, Mago +36, Clerigo +36
-  Jefe       Llamarada de fuego                 Tanque -220
+Ronda 8   jefe 142/591   equipo 890/1290
+  Jefe       Cataclismo de fuego                Guerrero -252, Tanque lo bloquea por completo, Clerigo -259
+      Guerrero cae
+      Clerigo cae
+  Tanque     Ataque basico                      Jefe -12
+
+Ronda 9   jefe 130/591   equipo 480/1290
+  Jefe       Carga Rayo final
+  Tanque     Ataque basico                      Jefe -10
+
+Ronda 10   jefe 120/591   equipo 480/1290
+  Jefe       Rayo final de rayo                 Tanque -553
       Tanque cae
 
-Ronda 5   jefe 395/777   equipo 442/1290
-  Guerrero   Ataque basico                      Jefe -18
-  Mago       Llama de fuego                     Jefe -76
-  Clerigo    Curacion en grupo                  Guerrero +36, Mago +36, Clerigo +36
-  Fase 2: el jefe cambia a Talisman de rayo y aprende Onda de choque y Golpe pesado (vida 301, menos de la mitad)
-    Vida 777   Ataque 103   Defensa 128   Ataque magico 330   Defensa magica 103   Velocidad 23.3
-  Jefe       Carga Aplastamiento
-
-Ronda 6   jefe 301/777   equipo 550/1290
-  Guerrero   Ataque basico                      Jefe -19
-  Mago       Llama de fuego                     Jefe -71
-  Clerigo    Curacion menor                     Clerigo +48
-  Jefe       Aplastamiento                      Guerrero -180
-
-Ronda 7   jefe 211/777   equipo 418/1290
-  Guerrero   Ataque basico                      Jefe -15
-  Mago       Bebe pocion de mana
-  Clerigo    Curacion menor                     Guerrero +48
-  Jefe       Zarpazo                            Guerrero -53
-
-Ronda 8   jefe 196/777   equipo 413/1290
-  Guerrero   Ataque basico                      Jefe -28 (critico)
-  Mago       Llama de fuego                     Jefe -78
-  Clerigo    Bebe pocion de mana
-  Jefe       Garra sombria de oscuridad         Mago -303
-      Mago cae
-
-Ronda 9   jefe 90/777   equipo 276/1290
-  Guerrero   Ataque basico                      Jefe -20
-  Clerigo    Curacion menor                     Guerrero +48
-  Jefe       Golpe pesado                       Guerrero -120
-
-Ronda 10   jefe 70/777   equipo 204/1290
-  Guerrero   Ataque basico                      Jefe -16
-  Clerigo    Curacion mayor                     Guerrero +96
-  Jefe       Marejada de agua                   Guerrero -146, Clerigo -150
-      Guerrero cae
-
-Ronda 11   jefe 54/777   equipo 21/1290
-  Clerigo    Curacion menor                     Clerigo +48
-  Jefe       Onda de choque                     Clerigo -43
-
-Ronda 12   jefe 54/777   equipo 26/1290
-  Clerigo    Curacion menor                     Clerigo +48
-  Jefe       Llamarada de fuego                 Clerigo -325
-      Clerigo cae
-
-Resultado: gana el jefe en 12 rondas. Vida del equipo al final: 0%
+Resultado: gana el jefe en 10 rondas. Vida del equipo al final: 0%

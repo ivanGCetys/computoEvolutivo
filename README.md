@@ -37,12 +37,15 @@ Los comandos van en la terminal. Todo usa semillas fijas, así que los números 
 
 | Paso | Comando | Qué debe salir | Tiempo |
 |---|---|---|---|
-| 1 | `python -m pytest -q` | 63 passed | 5 s |
+| 1 | `python -m pytest -q` | 64 passed | 5 s |
 | 2 | `python genetico.py` | Termina con F = 0.7491 | 30 s |
 | 3 | `python nsga2.py` | Un frente de 9 jefes con hipervolumen 0.2734 | 30 s |
 | 4 | `python narrar.py resumen` | Un combate, una línea por ronda | 1 s |
-| 5 | `python jugar.py` | Juegas tú contra el mejor jefe | lo que dure la partida |
-| 6 | `python comparar.py` | convergencia.png y resultados.csv | 10 min |
+| 5 | `python jugar.py` | Eliges un jefe del frente y juegas contra él | lo que dure la partida |
+| 6 | `python comparar.py corto` | resultados_corto.csv y comparacion_corto.png | 12 min |
+| 7 | `python comparar.py` | resultados_largo.csv, comparacion_largo.png y frente.png | 40 min |
+
+Los tiempos son de una máquina con 2 núcleos; `comparar.py` reparte las corridas entre todos los que haya.
 
 Si el paso 1 falla, no sigas: algo está roto.
 
@@ -78,7 +81,7 @@ El jefe reparte 1500 puntos entre sus seis atributos y lleva un objeto. No gasta
 - **Predisposición.** Elige a quién atacar con una probabilidad por clase que viene en sus genes.
 - **Bloqueo.** También puede gastar un turno en bloquear.
 
-Al equipo lo controla un jugador automático durante la evaluación (`heuristico.py`). En `jugar.py` lo controlas tú, con las mismas reglas.
+Al equipo lo controla un jugador automático durante la evaluación (`heuristico.py`). En `jugar.py` lo controlas tú, con las mismas reglas, y puedes escoger entre el jefe que eligió el algoritmo y el mejor del frente en cada objetivo.
 
 ## Archivos
 
@@ -93,12 +96,12 @@ Al equipo lo controla un jugador automático durante la evaluación (`heuristico
 | `aptitud.py` | Función objetivo F y función de costo C = 1 − F |
 | `genetico.py` | Algoritmo genético binario (rango, costo o torneo; cruce de un punto; mutación; elitismo) y búsqueda aleatoria |
 | `nsga2.py` | NSGA-II: ordenamiento no dominado, distancia de crowding, torneo binario, restricción e hipervolumen |
-| `comparar.py` | Algoritmo genético contra búsqueda aleatoria, 10 repeticiones, mismo presupuesto |
+| `comparar.py` | Experimento final: los dos algoritmos, con semillas fijas y rotativas, contra la búsqueda aleatoria |
 | `narrar.py` | Cuenta un combate turno por turno |
-| `jugar.py` | Modo interactivo en la terminal |
+| `jugar.py` | Modo interactivo en la terminal, contra un jefe del frente |
 | `calibrar.py` | Histograma de la tasa de victoria de jefes aleatorios |
 | `test_motor.py`, `test_genetico.py`, `test_nsga2.py` | Pruebas con los valores esperados calculados a mano |
-| `mejor_jefe.json` | El mejor jefe de una corrida; si lo borras, se vuelve a crear |
+| `frente.json`, `mejor_jefe.json` | El frente de una corrida de NSGA-II y el jefe elegido de ese frente; si los borras, se vuelven a crear |
 
 ## Cromosoma
 
@@ -151,15 +154,59 @@ El cromosoma, el cruce de un punto y la mutación son los mismos del algoritmo g
 
 **Semillas rotativas.** Para atacar el sobreajuste, cada generación pelea combates distintos y los padres se vuelven a evaluar junto con sus hijos. Cuesta el doble de evaluaciones por generación. El algoritmo genético de un solo objetivo también lo puede usar, con `rotarSemillas=True`.
 
-## Resultados del algoritmo genético
+## Resultados
 
-10 repeticiones por método, 610 evaluaciones cada una:
+10 corridas por método. Al final de cada corrida, el jefe que entrega el método se vuelve a medir con 30 combates por equipo que ningún método vio durante la búsqueda. Esa es la columna que cuenta.
 
-| Método | F final | F con combates nuevos |
-|---|---|---|
-| AG, selección por rango | 0.751 ± 0.015 | 0.606 |
-| AG, torneo | 0.743 ± 0.019 | 0.635 |
-| AG, ponderación por costo | 0.757 ± 0.015 | 0.629 |
-| Búsqueda aleatoria | 0.698 ± 0.024 | 0.620 |
+Presupuesto largo, 1830 evaluaciones (60 generaciones de 30 jefes):
 
-Con los combates de la búsqueda, los tres métodos del algoritmo genético superan a la búsqueda aleatoria. Con combates nuevos la ventaja desaparece: el algoritmo aprende las 10 semillas de combate con las que evalúa. Con el cromosoma de 134 bits el sobreajuste pesa más que antes y es lo siguiente que hay que atacar.
+| Método | F en la búsqueda | F con combates nuevos | t contra aleatoria | Corridas arriba de la media aleatoria |
+|---|---|---|---|---|
+| AG, semillas rotativas | 0.726 | 0.698 ± 0.025 | 3.56 | 10 de 10 |
+| NSGA-II, semillas rotativas | | 0.689 ± 0.033 | 2.79 | 9 de 10 |
+| NSGA-II, semillas fijas | | 0.675 ± 0.029 | 2.02 | 9 de 10 |
+| AG, semillas fijas | 0.781 | 0.653 ± 0.035 | 0.67 | 8 de 10 |
+| Búsqueda aleatoria | 0.710 | 0.642 ± 0.044 | | |
+
+![F con combates nuevos por método](comparacion_largo.png)
+
+Presupuesto corto, 630 evaluaciones (el del avance 2):
+
+| Método | F en la búsqueda | F con combates nuevos | t contra aleatoria |
+|---|---|---|---|
+| AG, semillas rotativas | 0.713 | 0.678 ± 0.031 | 1.47 |
+| NSGA-II, semillas rotativas | | 0.661 ± 0.046 | 0.22 |
+| Búsqueda aleatoria | 0.698 | 0.657 ± 0.031 | |
+| NSGA-II, semillas fijas | | 0.643 ± 0.038 | −0.95 |
+| AG, semillas fijas | 0.751 | 0.641 ± 0.032 | −1.12 |
+
+Lo que dicen los números:
+
+- **Las semillas rotativas son lo que más ayuda.** Con semillas fijas el algoritmo genético llega a F = 0.78 durante la búsqueda y se cae a 0.65 con combates nuevos: aprende los 10 combates con los que evalúa. Rotando las semillas la caída es de 0.73 a 0.70.
+- **Con 630 evaluaciones ningún método se separa de la búsqueda aleatoria.** Con el cromosoma de 134 bits ese presupuesto ya no alcanza. Con 1830 sí: los dos algoritmos con semillas rotativas le ganan con t = 3.56 y t = 2.79.
+- **La búsqueda aleatoria no mejora con más evaluaciones** (0.657 con 630, 0.642 con 1830). Entre más jefes prueba con los mismos combates, más probable es que se quede con uno que solo tuvo suerte.
+- **NSGA-II queda a la par del algoritmo genético en F** (0.689 contra 0.698; la diferencia está dentro de una desviación estándar) y además entrega un frente de jefes para escoger, no uno solo.
+
+![Frente de una corrida de NSGA-II](frente.png)
+
+Limitaciones:
+
+- F con combates nuevos se queda cerca de 0.70 para todos. Con 10 combates por equipo la tasa de victoria de cada equipo se mide con mucho ruido, y ser parejo contra los 15 equipos a la vez es difícil.
+- Los objetivos del frente se miden con ese mismo ruido: al volver a medirlos con combates nuevos algunos jefes del frente quedan dominados por otros.
+- 10 corridas por método es poco para afirmar diferencias chicas, como la que hay entre NSGA-II y el algoritmo genético con semillas rotativas.
+- El jugador automático no planea a futuro. Un jefe parejo contra él no tiene por qué serlo contra una persona.
+
+## Cómo se llegó aquí
+
+El proyecto pasó del juego del avance 2 al actual en cinco etapas. Cada una deja el repositorio funcionando, con sus pruebas pasando y sus propios resultados.
+
+| Etapa | Qué cambió | Cromosoma | Pruebas | F del AG por rango, 630 evaluaciones (búsqueda / combates nuevos) |
+|---|---|---|---|---|
+| Avance 2 | Punto de partida: 4 héroes, 4 elementos en ciclo, jefe de 4 habilidades | 44 bits | 33 | 0.886 / 0.687 |
+| 1 | Se separa `motor.py` en módulos, sin cambiar ninguna regla | 44 bits | 33 | 0.886 / 0.687 |
+| 2 | Lado de los héroes: 6 atributos, 6 clases con conjuros y maná, 8 elementos con objetos, físico y mágico, críticos, esquive, bloqueo, pociones de maná, 15 equipos | 56 bits | 43 | 0.586 / 0.471 |
+| 3 | Lado del jefe: cola de 8 ataques de un banco de 32, ataques de carga, fase 2 completa, predisposición por clase | 134 bits | 50 | 0.751 / 0.606 |
+| 4 | NSGA-II con restricción, hipervolumen y semillas rotativas | 134 bits | 63 | |
+| 5 | Experimento final con validación y dos presupuestos; el juego usa el frente | 134 bits | 64 | 0.751 / 0.641 (ver tablas de arriba) |
+
+Dos cosas cambiaron respecto al avance 2 además de las reglas. El jefe ya no se califica con su peor equipo sino con el promedio de los 15, porque con tantos equipos el peor castigaba a jefes buenos por una sola combinación rara. Y la validación de la etapa 5 usa 30 combates por equipo en lugar de 10, por eso su número con combates nuevos no es idéntico al de la etapa 3.

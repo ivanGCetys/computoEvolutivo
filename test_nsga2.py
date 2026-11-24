@@ -125,3 +125,10 @@ def testFrenteFinal():
     for _, a, va in frente:
         for _, b, vb in frente:
             assert not n2.domina(a, b, va, vb)
+
+
+def testTDeWelch():
+    # medias 2 y 3, varianzas muestrales 1 y 1, tres datos cada una
+    # t = (2 - 3) / raiz(1/3 + 1/3) = -1.2247
+    import comparar
+    assert comparar.tDeWelch([1, 2, 3], [2, 3, 4]) == pytest.approx(-1.2247, abs=1e-4)
