@@ -10,12 +10,12 @@ def enBits(valor, ancho):
     return [int(c) for c in format(valor, "0%db" % ancho)]
 
 
-# 1. Codificación: 134 bits y cómo se parten
+# 1. Codificación: 132 bits y cómo se parten
 def test_tamano_del_cromosoma():
     # 6 atributos x 4 + 2 objetos x 4 + 8 ataques x 5 + 8 pesos x 2
-    # + 2 cambios x (3 + 5) + 5 ajustes x 2 + 6 predisposiciones x 3 + 2 de bloqueo
-    assert 24 + 8 + 40 + 16 + 16 + 10 + 18 + 2 == 134
-    assert g.N_BITS == 134
+    # + 2 cambios x (3 + 5) + 5 ajustes x 2 + 6 predisposiciones x 3
+    assert 24 + 8 + 40 + 16 + 16 + 10 + 18 == 132
+    assert g.N_BITS == 132
 
 
 def test_entero_desde_bits():
@@ -44,8 +44,7 @@ def test_decodificar_a_mano():
         bits += enBits(v, 2)
     for v in [0, 7, 0, 0, 0, 0]:            # predisposición por clase
         bits += enBits(v, 3)
-    bits += enBits(2, 2)                    # bloqueo
-    assert len(bits) == 134
+    assert len(bits) == 132
 
     c = g.decodificar(bits)
     # puntos = 100 fijos + 900 por proporción:
@@ -58,13 +57,13 @@ def test_decodificar_a_mano():
     assert c["cambios"] == [[0, 8], [7, 30]]
     assert c["ajustes"] == [3, 0, 1, 2, 3]
     assert c["predisposicion"] == [0, 7, 0, 0, 0, 0]
-    assert c["probBloqueo"] == 2
+    assert "probBloqueo" not in c
 
 
 def testCualquierCadenaEsUnJefeValido():
     # Todo en ceros repetiría el ataque 0 ocho veces: la reparación deja 0 a 7 en
     # la cola y manda los dos cambios de la fase 2 a los siguientes libres, 8 y 9.
-    c = g.decodificar([0] * 134)
+    c = g.decodificar([0] * 132)
     assert c["habs"] == [0, 1, 2, 3, 4, 5, 6, 7]
     assert c["cambios"] == [[0, 8], [0, 9]]
     assert c["puntos"] == [250] * 6

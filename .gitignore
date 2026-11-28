@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Volumen guardado por el juego
+opciones.json
+
 # C extensions
 *.so
 

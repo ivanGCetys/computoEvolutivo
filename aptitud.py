@@ -10,7 +10,7 @@ from combate import simular
 # se usa la media.
 BANDAS = {"facil": (0.70, 0.90), "media": (0.40, 0.60), "dificil": (0.20, 0.40)}
 W_MARGEN, W_DURACION, W_VARIEDAD = 0.5, 0.25, 0.25
-RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 10, 3, 0.20
+RONDAS_IDEAL, SIGMA_RONDAS, HP_IDEAL = 14, 3, 0.20
 
 # Con 15 equipos bajamos los combates por equipo de 30 a 10. Son 150 combates
 # por jefe en lugar de 120, casi el mismo trabajo que antes.
@@ -52,7 +52,7 @@ def objetivos(crom, n=combatesPorEquipo, semilla=0):
     # nosotros escogimos al sumarlos:
     #   desbalance   qué tan lejos queda la tasa de victoria de 50%
     #   holgura      el equipo gana con mucha más vida que el 20% ideal
-    #   desajuste    los combates duran mucho más o mucho menos de 10 rondas
+    #   desajuste    los combates duran mucho más o mucho menos de 14 rondas
     # La variedad se queda fuera. Desde que el jefe ataca con una cola, casi
     # cualquier jefe la tiene arriba de 0.9 y como objetivo solo llenaba el
     # frente de jefes malos que ganaban una centésima de variedad.

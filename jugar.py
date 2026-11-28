@@ -12,13 +12,17 @@ import narrar
 PAUSA = 1.2
 
 
-def rangoDano(i, est, poder, esFisico, elem):
+def rangoDano(i, est, poder, esFisico, elem, buff=None):
     # Daño mínimo y máximo sin contar crítico ni esquive, con todo lo que el
-    # motor aplicaría en este momento: objetos, buff de ataque y guardia del jefe.
+    # motor aplicaría en este momento: objetos y buff de ataque.
+    # buff es el del propio conjuro: el motor lo aplica antes de pegar, así que
+    # ese mismo golpe ya sale con el ataque subido.
     yo, jefe = est["equipo"][i], est["jefe"]
     atk = yo["atk"] if esFisico else yo["atkMag"]
     defensa = jefe["defe"] if esFisico else jefe["defMag"]
-    if est["buffAtk"][i] > 0:
+    if buff is not None and buff[0] == "atk":
+        atk = atk * buff[1]
+    elif est["buffAtk"][i] > 0:
         atk = atk * est["multBuffAtk"][i]
 
     mult = 1.0
@@ -26,10 +30,9 @@ def rangoDano(i, est, poder, esFisico, elem):
         mult = yo["objeto"]["multAtk"][elem]
         defensa = defensa * est["objJefe"]["multDef"][elem]
 
-    bloqueo = m.multBloqueo if est["guardia"] else 1.0
     lo, hi = (yo["minFis"], m.variacionFisMax) if esFisico else (m.variacionMagMin, m.variacionMagMax)
-    return (m.calcular_dano(atk, poder, mult * lo, defensa, bloqueo),
-            m.calcular_dano(atk, poder, mult * hi, defensa, bloqueo))
+    return (m.calcular_dano(atk, poder, mult * lo, defensa),
+            m.calcular_dano(atk, poder, mult * hi, defensa))
 
 
 def textoOpcion(i, accion, est):
@@ -41,10 +44,14 @@ def textoOpcion(i, accion, est):
     if tipo == "bloquear":
         return "Bloquear (recibe la mitad del daño hasta su siguiente turno)"
     if tipo == "pocion":
-        base = yo["hp"] if cual.startswith("hp") else yo["sp"]
+        # Las pociones son del equipo; las que otro ya apartó esta ronda no cuentan.
+        quien = est["equipo"][i if objetivo is None else objetivo]
+        base = quien["hp"] if cual.startswith("hp") else quien["sp"]
         que = "vida" if cual.startswith("hp") else "mana"
-        return "%s (+%d de %s, quedan %d)" % (m.nombrePocion[cual].capitalize(),
-                                              int(m.efectoPocion[cual] * base), que, est["pociones"][cual])
+        quedan = est["pociones"][cual] - est.get("reservadas", {}).get(cual, 0)
+        aQuien = "" if objetivo in (None, i) else " a " + quien["nombre"]
+        return "%s%s (+%d de %s, quedan %d)" % (m.nombrePocion[cual].capitalize(), aQuien,
+                                                int(m.efectoPocion[cual] * base), que, quedan)
 
     conj = yo["conjuros"][cual]
     costo = "%d de mana" % conj["costo"]
@@ -57,7 +64,7 @@ def textoOpcion(i, accion, est):
             extra += ", se adelanta"
         if conj.get("buff"):
             extra += ", sube su ataque x%.1f por %d turnos" % conj["buff"][1:]
-        lo, hi = rangoDano(i, est, conj["poder"], conj["esFisico"], conj["elem"])
+        lo, hi = rangoDano(i, est, conj["poder"], conj["esFisico"], conj["elem"], conj.get("buff"))
         return "%s (%s, %d a %d de daño%s, %s)" % (conj["nombre"], clase, lo, hi, extra, costo)
 
     if conj["tipo"] == "buff":
@@ -78,6 +85,7 @@ class Partida:
         self.registro = []
         self.mostrados = 0
         self.pausa = pausa
+        self.rondaMostrada = None
 
     def al_dia(self):
         # Muestra lo que pasó desde la última vez que se le preguntó al jugador.
@@ -108,15 +116,29 @@ class Partida:
         if self.pausa:
             time.sleep(self.pausa)
 
-    def turno(self, i, est, opciones, enVentana):
+    def turno(self, i, est, opciones):
         # Esta es la política que recibe el motor: en lugar de decidir, pregunta.
         self.al_dia()
         equipo, hp, sp = est["equipo"], est["hp"], est["sp"]
         yo = equipo[i]
 
+        # Como todos eligen con la misma información, la situación se muestra
+        # una vez por ronda, antes del primer héroe.
+        if est["ronda"] != self.rondaMostrada:
+            self.rondaMostrada = est["ronda"]
+            self.mostrarSituacion(est)
+
+        # Todos eligen antes de que empiece la ronda; luego se juega por velocidad.
+        print("\n  ¿Qué hará %s esta ronda?" % yo["nombre"])
+
+        textos = [textoOpcion(i, a, est) for a in opciones]
+        for n, texto in enumerate(textos, start=1):
+            print("    %d) %s" % (n, texto))
+        return opciones[leerNumero(len(opciones), "  > ") - 1]
+
+    def mostrarSituacion(self, est):
+        equipo, hp, sp = est["equipo"], est["hp"], est["sp"]
         print("\n  Jefe: %d/%d de vida, lleva %s" % (est["hp_jefe"], est["jefe"]["hp"], est["objJefe"]["nombre"]))
-        if est["guardia"]:
-            print("  El jefe está bloqueando: recibirá la mitad del daño.")
         if est["cargando"] is not None:
             print("  El jefe está cargando %s y lo suelta en su siguiente turno." % est["cargando"]["nombre"])
         else:
@@ -125,19 +147,6 @@ class Partida:
         for j, p in enumerate(equipo):
             estado = "" if hp[j] else " (caído)"
             print("  %-10s vida %3d/%-3d  mana %3d/%-3d%s" % (p["nombre"], hp[j], p["hp"], sp[j], p["sp"], estado))
-
-        if enVentana:
-            print("\n  %s puede adelantarse a todos en esta ronda:" % yo["nombre"])
-        else:
-            print("\n  Turno de %s:" % yo["nombre"])
-
-        textos = [textoOpcion(i, a, est) for a in opciones]
-        if enVentana:
-            opciones = opciones + [None]
-            textos.append("Esperar su turno normal")
-        for n, texto in enumerate(textos, start=1):
-            print("    %d) %s" % (n, texto))
-        return opciones[leerNumero(len(opciones), "  > ") - 1]
 
 
 def leerNumero(maximo, prompt):
@@ -223,22 +232,28 @@ def jugar(crom, clave_equipo=None, semilla=None, pausa=PAUSA, objetosElegidos=No
     return res
 
 
-def elegirJefe():
-    # NSGA-II no entrega un jefe sino un frente. Aquí se ofrecen el que eligió
+def candidatosDeJefe():
+    # NSGA-II no entrega un jefe sino un frente. De ahí se ofrecen el que eligió
     # el algoritmo y el mejor en cada objetivo, para que se note la diferencia
-    # entre ellos al jugar.
+    # entre ellos al jugar. Devuelve el tamaño del frente y los pares de
+    # (título, jefe), sin repetir jefes.
     frente = narrar.cargarOCrearFrente()
     candidatos = [("El que eligió el algoritmo", next(j for j in frente if j["elegido"])),
                   ("El más parejo", min(frente, key=lambda j: j["objetivos"][0])),
                   ("El de final más cerrado", min(frente, key=lambda j: j["objetivos"][1])),
-                  ("El de duración más cercana a 10 rondas", min(frente, key=lambda j: j["objetivos"][2]))]
+                  ("El de duración más cercana a 14 rondas", min(frente, key=lambda j: j["objetivos"][2]))]
 
     opciones = []
     for titulo, jefe in candidatos:
         if all(jefe is not otro for _, otro in opciones):
             opciones.append((titulo, jefe))
+    return len(frente), opciones
 
-    print("\nElige al jefe. Todos vienen del mismo frente de Pareto, de %d jefes:" % len(frente))
+
+def elegirJefe():
+    tamFrente, opciones = candidatosDeJefe()
+
+    print("\nElige al jefe. Todos vienen del mismo frente de Pareto, de %d jefes:" % tamFrente)
     for n, (titulo, jefe) in enumerate(opciones, start=1):
         print("  %d) %-40s desbalance %.2f, holgura %.2f, desajuste de duración %.2f"
               % ((n, titulo) + tuple(jefe["objetivos"])))

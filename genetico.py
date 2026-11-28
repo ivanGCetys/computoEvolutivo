@@ -6,7 +6,7 @@
 import random
 import motor as m
 
-# El cromosoma son 134 bits partidos en tramos. Cada tramo es nombre, cuántos
+# El cromosoma son 132 bits partidos en tramos. Cada tramo es nombre, cuántos
 # valores guarda y cuántos bits ocupa cada valor:
 #   puntos          6 de 4 bits, la proporción del presupuesto por atributo
 #   objetos         2 de 4 bits, el objeto equipado en cada fase
@@ -16,11 +16,12 @@ import motor as m
 #   nuevosCambios   2 de 5 bits, por cuáles ataques se cambian
 #   ajustes         5 de 2 bits, cómo se mueve cada atributo en la fase 2
 #   predisposicion  6 de 3 bits, preferencia por atacar a cada clase
-#   bloqueo         1 de 2 bits, qué tan seguido bloquea
+# Hasta la etapa 6 había un tramo más, de 2 bits, con la probabilidad de que el
+# jefe bloqueara; desde la etapa 7 el jefe ya no bloquea.
 # Los valores crudos no tienen que ser válidos porque motor.reparar los arregla.
 TRAMOS = [("puntos", 6, 4), ("objetos", 2, 4), ("habs", 8, 5), ("pesos", 8, 2),
           ("posCambios", 2, 3), ("nuevosCambios", 2, 5), ("ajustes", 5, 2),
-          ("predisposicion", 6, 3), ("bloqueo", 1, 2)]
+          ("predisposicion", 6, 3)]
 N_BITS = sum(cuantos * ancho for _, cuantos, ancho in TRAMOS)
 
 
@@ -43,8 +44,7 @@ def decodificar(bits):
                       "habs": campos["habs"], "pesos": campos["pesos"],
                       "cambios": list(zip(campos["posCambios"], campos["nuevosCambios"])),
                       "ajustes": campos["ajustes"],
-                      "predisposicion": campos["predisposicion"],
-                      "probBloqueo": campos["bloqueo"][0]})
+                      "predisposicion": campos["predisposicion"]})
 
 
 def bits_al_azar(rng):

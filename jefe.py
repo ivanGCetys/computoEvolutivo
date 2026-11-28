@@ -9,7 +9,6 @@
 #   cambios         2 pares (posición, ataque nuevo) que se aplican en la fase 2
 #   ajustes         5 valores de 0 a 3, cómo cambian sus atributos en la fase 2
 #   predisposicion  6 valores de 0 a 7, a qué clases prefiere atacar
-#   probBloqueo     de 0 a 3, qué tan seguido gasta el turno en bloquear
 from reglas import nObjetos, indiceElem
 
 nStats = 6
@@ -18,11 +17,15 @@ PRESUPUESTO, PUNTOS_MIN, PUNTOS_MAX = 1500, 100, 500
 # La escala viene de la calibración con jefes aleatorios. Al pasar a seis
 # atributos se subió el presupuesto de 1000 a 1500 para conservar el promedio
 # de 250 puntos por atributo. Con el banco de 32 ataques el jefe reparte su
-# daño entre más héroes, así que se le subió la vida de 3 a 3.5 por punto para
-# que la mediana de los jefes aleatorios volviera a quedar cerca de 50%.
-HP_POR_PUNTO = 3.5
+# daño entre más héroes, así que se le subió la vida por punto para que la
+# mediana de los jefes aleatorios volviera a quedar cerca de 50%. El valor
+# actual es el que deja esa mediana en su lugar con las clases ya calibradas.
+# Cuando el objetivo pasó a 14 rondas se le dio más vida al jefe y se le bajó
+# el ataque (antes 3.3 y 1.8), junto con más vida a los héroes, para que las
+# peleas duren eso sin que el jefe tenga que esconderse detrás del bloqueo.
+HP_POR_PUNTO = 5.5
 ATK_DIV, DEF_DIV = 2, 3
-ESCALA_ATK, ESCALA_DEF = 1.8, 1
+ESCALA_ATK, ESCALA_DEF = 1.54, 1
 DIVISOR_VEL = 10
 
 tamanoCola, tamanoVentana = 8, 4
@@ -32,7 +35,6 @@ nCambios = 2
 # hacia abajo según su gen.
 multAjuste = [0.85, 0.95, 1.05, 1.15]
 statsAjustables = ["atk", "defe", "atkMag", "defMag", "vel"]
-opcionesBloqueo = [0.0, 0.05, 0.10, 0.15]
 
 
 def ataque(nombre, poder, esFisico, elem=None, enArea=False, carga=False):
@@ -41,7 +43,8 @@ def ataque(nombre, poder, esFisico, elem=None, enArea=False, carga=False):
 
 
 # Banco de 32 ataques. Los de área pegan menos a cada héroe pero suman más
-# daño en total. Los cuatro últimos gastan un turno en cargar y pegan al
+# daño en total; salen la mitad de seguido que los demás (ver pesoArea en
+# combate.py), así que cuando llegan pegan fuerte. Los cuatro últimos gastan un turno en cargar y pegan al
 # siguiente, lo que le da tiempo al equipo de bloquear.
 HABILIDADES = [
     ataque("Zarpazo", 0.80, True),
@@ -53,10 +56,10 @@ HABILIDADES = [
     ataque("Garra doble", 1.20, True),
     ataque("Golpe pesado", 1.30, True),
 
-    ataque("Onda de choque", 0.50, True, enArea=True),
-    ataque("Barrido", 0.55, True, enArea=True),
-    ataque("Estampida", 0.60, True, enArea=True),
-    ataque("Terremoto", 0.60, True, "tierra", enArea=True),
+    ataque("Onda de choque", 0.65, True, enArea=True),
+    ataque("Barrido", 0.70, True, enArea=True),
+    ataque("Estampida", 0.75, True, enArea=True),
+    ataque("Terremoto", 0.75, True, "tierra", enArea=True),
 
     ataque("Llamarada", 1.30, False, "fuego"),
     ataque("Chorro", 1.30, False, "agua"),
@@ -67,19 +70,19 @@ HABILIDADES = [
     ataque("Rayo de luz", 1.30, False, "luz"),
     ataque("Garra sombria", 1.30, False, "oscuridad"),
 
-    ataque("Incendio", 0.65, False, "fuego", enArea=True),
-    ataque("Marejada", 0.65, False, "agua", enArea=True),
-    ataque("Vendaval", 0.65, False, "viento", enArea=True),
-    ataque("Avalancha", 0.65, False, "tierra", enArea=True),
-    ataque("Enredadera", 0.65, False, "planta", enArea=True),
-    ataque("Tormenta", 0.65, False, "rayo", enArea=True),
-    ataque("Resplandor", 0.65, False, "luz", enArea=True),
-    ataque("Eclipse", 0.65, False, "oscuridad", enArea=True),
+    ataque("Incendio", 0.85, False, "fuego", enArea=True),
+    ataque("Marejada", 0.85, False, "agua", enArea=True),
+    ataque("Vendaval", 0.85, False, "viento", enArea=True),
+    ataque("Avalancha", 0.85, False, "tierra", enArea=True),
+    ataque("Enredadera", 0.85, False, "planta", enArea=True),
+    ataque("Tormenta", 0.85, False, "rayo", enArea=True),
+    ataque("Resplandor", 0.85, False, "luz", enArea=True),
+    ataque("Eclipse", 0.85, False, "oscuridad", enArea=True),
 
     ataque("Aplastamiento", 2.60, True, carga=True),
-    ataque("Devastacion", 1.20, True, enArea=True, carga=True),
+    ataque("Devastacion", 1.40, True, enArea=True, carga=True),
     ataque("Rayo final", 2.80, False, "rayo", carga=True),
-    ataque("Cataclismo", 1.30, False, "fuego", enArea=True, carga=True),
+    ataque("Cataclismo", 1.50, False, "fuego", enArea=True, carga=True),
 ]
 N_HABILIDADES = len(HABILIDADES)
 
@@ -142,19 +145,23 @@ def _reparar_resto(crom, enteros):
         ocupados.add(nuevo)
         cambios.append([int(pos) % tamanoCola, nuevo])
 
-    return {"puntos": enteros,
-            "objeto1": int(crom["objeto1"]) % nObjetos, "objeto2": int(crom["objeto2"]) % nObjetos,
-            "habs": habs,
-            "pesos": [int(w) % 4 for w in crom["pesos"]],
-            "cambios": cambios,
-            "ajustes": [int(a) % len(multAjuste) for a in crom["ajustes"]],
-            "predisposicion": [int(p) % 8 for p in crom["predisposicion"]],
-            "probBloqueo": int(crom["probBloqueo"]) % len(opcionesBloqueo)}
+    reparado = {"puntos": enteros,
+                "objeto1": int(crom["objeto1"]) % nObjetos, "objeto2": int(crom["objeto2"]) % nObjetos,
+                "habs": habs,
+                "pesos": [int(w) % 4 for w in crom["pesos"]],
+                "cambios": cambios,
+                "ajustes": [int(a) % len(multAjuste) for a in crom["ajustes"]],
+                "predisposicion": [int(p) % 8 for p in crom["predisposicion"]]}
+    # La vida que se le agrega a mano a un jefe ya elegido no es un gen: la
+    # búsqueda nunca la toca, solo se conserva.
+    if crom.get("vidaExtra"):
+        reparado["vidaExtra"] = int(crom["vidaExtra"])
+    return reparado
 
 
 def stats_jefe(crom):
     p_hp, p_atk, p_def, pAtkMag, pDefMag, p_vel = crom["puntos"]
-    return {"hp": int(p_hp * HP_POR_PUNTO),
+    return {"hp": int(p_hp * HP_POR_PUNTO) + crom.get("vidaExtra", 0),
             "atk": int(p_atk * ESCALA_ATK / ATK_DIV), "defe": int(p_def * ESCALA_DEF / DEF_DIV),
             "atkMag": int(pAtkMag * ESCALA_ATK / ATK_DIV), "defMag": int(pDefMag * ESCALA_DEF / DEF_DIV),
             "vel": p_vel / DIVISOR_VEL}

@@ -120,7 +120,7 @@ def cargarOCrearFrente():
     import genetico as g
     import nsga2
     frente, _ = nsga2.correrNsga2(semillaRng=1, generaciones=30)
-    elegido = nsga2.elegirDelFrente(frente)
+    elegido = nsga2.elegirParaJugar(frente)
     jefes = [{"crom": g.decodificar(bits), "objetivos": list(objs), "elegido": bits is elegido[0]}
              for bits, objs, _ in frente]
     with open(ARCHIVO_FRENTE, "w") as f:

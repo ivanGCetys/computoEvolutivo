@@ -20,7 +20,7 @@ class RNGFijo:
 jefeParejo = {"puntos": [250] * 6, "objeto1": 0, "objeto2": 0,
                "habs": [0, 1, 2, 3, 4, 5, 6, 7], "pesos": [0] * 8,
                "cambios": [[0, 8], [7, 30]], "ajustes": [1] * 5,
-               "predisposicion": [0] * 6, "probBloqueo": 0}
+               "predisposicion": [0] * 6}
 
 
 def jefeDe(**genes):
@@ -124,44 +124,53 @@ def testRepararColaYCambios():
     # el resto de los genes se dobla a su rango con el módulo
     c = m.reparar(jefeDe(puntos=[1] * 6, objeto1=17, objeto2=-1, habs=[5] * 8, pesos=[5] * 8,
                          cambios=[[9, 5], [3, 5]], ajustes=[7] * 5,
-                         predisposicion=[9] * 6, probBloqueo=6))
+                         predisposicion=[9] * 6))
     assert c["habs"] == [5, 0, 1, 2, 3, 4, 6, 7]
     assert c["cambios"] == [[1, 8], [3, 9]]
     assert c["pesos"] == [1] * 8                     # 5 % 4
     assert c["ajustes"] == [3] * 5                   # 7 % 4
     assert c["predisposicion"] == [1] * 6            # 9 % 8
-    assert c["probBloqueo"] == 2                     # 6 % 4
     assert c["puntos"] == [250] * 6
     assert (c["objeto1"], c["objeto2"]) == (1, 15)   # 17 % 16 = 1 ; -1 % 16 = 15
 
 
 def testStatsDelJefe():
-    # 250 puntos en todo: vida int(250 x 3.5) = 875, ataques int(250 x 1.8 / 2) = 225,
+    # 250 puntos en todo: vida int(250 x 5.5) = 1375, ataques int(250 x 1.54 / 2) = 192,
     # defensas int(250 / 3) = 83, velocidad 250/10
-    assert m.stats_jefe(jefeParejo) == {"hp": 875, "atk": 225, "defe": 83,
-                                         "atkMag": 225, "defMag": 83, "vel": 25.0}
+    assert m.stats_jefe(jefeParejo) == {"hp": 1375, "atk": 192, "defe": 83,
+                                         "atkMag": 192, "defMag": 83, "vel": 25.0}
 
 
 def testBancoDeAtaques():
     assert m.N_HABILIDADES == 32
     assert sum(1 for a in m.HABILIDADES if a["carga"]) == 4
-    # Los de área pegan menos a cada héroe que cualquier ataque a uno solo,
+    # Los de área pegan a cada héroe menos que un ataque a uno solo promedio,
     # pero contra cuatro héroes suman más que el más fuerte de esos
     unicos = [a["poder"] for a in m.HABILIDADES if not a["enArea"] and not a["carga"]]
     areas = [a["poder"] for a in m.HABILIDADES if a["enArea"] and not a["carga"]]
-    assert max(areas) < min(unicos)
+    assert max(areas) < sum(unicos) / len(unicos)
     assert 4 * min(areas) > max(unicos)
 
 
 # 4. Clases y equipos
+def testVidaExtraDelJefeDelJuego():
+    # Al jefe que se juega se le pueden sumar puntos de vida a mano; la
+    # reparación los conserva y la fase 2 se mide contra la vida ya sumada.
+    crom = m.reparar(jefeDe(vidaExtra=200))
+    assert crom["vidaExtra"] == 200
+    assert m.stats_jefe(crom)["hp"] == 1375 + 200 and m.statsFase2(crom)["hp"] == 1575
+    assert "vidaExtra" not in m.reparar(jefeParejo)
+
+
 def testClasesRepartenElMismoTope():
     for nombre in m.nombresClases:
         assert sum(m.tablaClases[nombre]["puntos"]) == m.topePuntosHeroe
-    # Guerrero, 100 puntos en todo: vida 300, ataques 50, defensas 33, velocidad 25
+    # Guerrero, 100 puntos en todo: vida 100 x 3.8 = 380, ataques 50, defensas 33, velocidad 25
     g = m.crearHeroe("Guerrero")
-    assert (g["hp"], g["atk"], g["defe"], g["atkMag"], g["defMag"], g["vel"]) == (300, 50, 33, 50, 33, 25.0)
-    # Solo mago y clérigo recuperan maná
-    assert [n for n in m.nombresClases if m.tablaClases[n]["regenSp"] > 0] == ["Mago", "Clerigo"]
+    assert (g["hp"], g["atk"], g["defe"], g["atkMag"], g["defMag"], g["vel"]) == (380, 50, 33, 50, 33, 25.0)
+    # Todos recuperan algo de maná cada turno, y el mago, que vive de su magia, más que nadie
+    regen = {n: m.tablaClases[n]["regenSp"] for n in m.nombresClases}
+    assert all(r > 0 for r in regen.values()) and regen["Mago"] == max(regen.values())
 
 
 def testQuinceEquipos():
@@ -196,33 +205,41 @@ def testAtaqueBasicoAMano():
     est = estadoDePrueba()
     hecho = m.ejecutarAccion(0, ("basico", None, None), est, RNGFijo(0.5))
     assert hecho["golpes"] == [("Jefe", 22, "")]
-    assert est["hp_jefe"] == 875 - 22
+    assert est["hp_jefe"] == 1375 - 22
 
 
 def testCurasDelClerigo():
-    # Ataque mágico del clérigo: 120 // 2 = 60. Menor: 60 x 0.8 = 48. Grupo: 60 x 0.6 = 36
+    # Ataque mágico del clérigo: 120 // 2 = 60. Menor: 60 x 1.25 = 75. Grupo: 60 x 0.95 = 57
     est = estadoDePrueba()
-    est["hp"] = [100, 470, 0, 300]
+    est["hp"] = [100, 530, 0, 300]
     m.ejecutarAccion(3, ("conjuro", 0, 0), est, RNGFijo(0.5))
-    assert est["hp"][0] == 148 and est["sp"][3] == 110 - 10
+    assert est["hp"][0] == 175 and est["sp"][3] == 110 - 10
     m.ejecutarAccion(3, ("conjuro", 2, None), est, RNGFijo(0.5))
-    # el tanque se topa en su máximo de 480 y el mago caído no revive
-    assert est["hp"] == [184, 480, 0, 300] and est["sp"][3] == 60
+    # el tanque se topa en su máximo de int(148 x 3.8) = 562 y el mago caído no revive
+    assert est["hp"] == [232, 562, 0, 357] and est["sp"][3] == 60
 
 
 def testPociones():
     est = estadoDePrueba()
     est["hp"][2], est["sp"][2] = 10, 0
-    m.ejecutarAccion(2, ("pocion", "hpGrande", None), est, RNGFijo(0.5))    # 60% de 210 = 126
+    m.ejecutarAccion(2, ("pocion", "hpGrande", None), est, RNGFijo(0.5))    # 60% de 70 x 3.8 = 266 -> 159
     m.ejecutarAccion(2, ("pocion", "spChica", None), est, RNGFijo(0.5))     # 30% de 100 = 30
-    assert est["hp"][2] == 136 and est["sp"][2] == 30
-    assert est["pociones"] == {"hpChica": 2, "hpGrande": 0, "spChica": 1, "spGrande": 1}
+    assert est["hp"][2] == 169 and est["sp"][2] == 30
+    assert est["pociones"] == {"hpChica": 3, "hpGrande": 1, "spChica": 1, "spGrande": 1}
+    # Son de todo el equipo: el Guerrero le da una chica al Mago, 30% de 266 = 79
+    hecho = m.ejecutarAccion(0, ("pocion", "hpChica", 2), est, RNGFijo(0.5))
+    assert est["hp"][2] == 169 + 79 and hecho["curas"] == [("Mago", 79)]
+    assert hecho["accion"] == "Le da a Mago una pocion de vida"
+    # Si ya no queda, el turno se va en buscarla
+    est["pociones"]["hpGrande"] = 0
+    hecho = m.ejecutarAccion(0, ("pocion", "hpGrande", 2), est, RNGFijo(0.5))
+    assert hecho["accion"].startswith("Busca") and hecho["curas"] == []
 
 
 def testBuffDuraDosTurnos():
     est = estadoDePrueba()
     m.ejecutarAccion(0, ("conjuro", 0, None), est, RNGFijo(0.5))     # Guardia de acero
-    assert est["buffDef"][0] == 2 and est["sp"][0] == 44 - 8
+    assert est["buffDef"][0] == 2 and est["sp"][0] == 66 - 8
     m.ejecutarAccion(0, ("basico", None, None), est, RNGFijo(0.5))
     assert est["buffDef"][0] == 1
     m.ejecutarAccion(0, ("basico", None, None), est, RNGFijo(0.5))
@@ -230,29 +247,29 @@ def testBuffDuraDosTurnos():
 
 
 def testDefensasDelTanque():
-    # Jefe parejo (ataque 225) pega físico con poder 1.0 al tanque (defensa 50), variación 1.00
-    # normal: 225 x 100/150 = 150 | bloqueando: 75 | con Muralla (50 x 1.6 = 80): 225 x 100/180 = 125
+    # Jefe parejo (ataque 192) pega físico con poder 1.0 al tanque (defensa 50), variación 1.00
+    # normal: 192 x 100/150 = 128 | bloqueando: 64 | con Muralla (50 x 1.6 = 80): 192 x 100/180 = 106.7 -> 106
     est = estadoDePrueba()
-    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (150, "")
+    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (128, "")
     est["bloq"][1] = True
-    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (75, "")
+    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (64, "")
     est["bloq"][1] = False
     m.ejecutarAccion(1, ("conjuro", 0, None), est, RNGFijo(0.5))
-    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (125, "")
-    assert est["hp"][1] == 480 - 150 - 75 - 125
+    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (106, "")
+    assert est["hp"][1] == 562 - 128 - 64 - 106
 
     # Bloqueo total: anula un ataque y se gasta
     m.ejecutarAccion(1, ("conjuro", 1, None), est, RNGFijo(0.5))
     assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5)) == (0, "bloqueado")
-    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5))[0] == 125
+    assert m.atacarHeroe(1, 1.0, True, None, est, RNGFijo(0.5))[0] == 106
 
 
 def testFuriaDesatadaPegaConElBuff():
-    # Berserker: ataque 95 x 1.5 = 142.5; poder 1.0; variación 1.00; defensa del jefe 83
-    # 142.5 x 100/183 = 77.87 -> 77
+    # Berserker: ataque 141 // 2 = 70, x 1.3 = 91; poder 1.0; variación 1.00; defensa del jefe 83
+    # 91 x 100/183 = 49.73 -> 49
     est = estadoDePrueba(equipo=m.EQUIPOS["GTMB"])
     hecho = m.ejecutarAccion(3, ("conjuro", 1, None), est, RNGFijo(0.5))
-    assert hecho["golpes"] == [("Jefe", 77, "")]
+    assert hecho["golpes"] == [("Jefe", 49, "")]
     assert est["buffAtk"][3] == 2 and est["sp"][3] == 40 - 18
 
 
@@ -264,10 +281,17 @@ def testAccionesLegales():
     # Sin maná desaparecen los conjuros
     est["sp"][0] = 5
     assert ("conjuro", 0, None) not in m.accionesLegales(0, est)
-    # Herido aparecen las pociones de vida, y con poco maná las de maná
+    # Herido aparecen las pociones de vida, y con poco maná las de maná; cada
+    # poción dice a quién va
     est["hp"][0] = 50
-    assert ("pocion", "hpChica", None) in m.accionesLegales(0, est)
-    assert ("pocion", "spGrande", None) in m.accionesLegales(0, est)
+    assert ("pocion", "hpChica", 0) in m.accionesLegales(0, est)
+    assert ("pocion", "spGrande", 0) in m.accionesLegales(0, est)
+    # Las pociones son del equipo: el Mago también puede dársela al Guerrero
+    assert ("pocion", "hpChica", 0) in m.accionesLegales(2, est)
+    assert ("pocion", "hpChica", 2) not in m.accionesLegales(2, est)
+    # Las que otro ya apartó en esta ronda no se ofrecen
+    est["reservadas"]["hpGrande"] = 2
+    assert ("pocion", "hpGrande", 0) not in m.accionesLegales(2, est)
     # La cura individual del clérigo da una opción por cada aliado vivo
     est["hp"][2] = 0
     assert [a for a in m.accionesLegales(3, est) if a[1] == 0] == [("conjuro", 0, 0), ("conjuro", 0, 1), ("conjuro", 0, 3)]
@@ -283,6 +307,110 @@ def testElPicaroSeAdelanta():
     primerTurno = next(e for e in reg if e["tipo"] == "turno")
     assert primerTurno["actor"] == "Picaro" and primerTurno["adelantado"]
     assert primerTurno["accion"] in ("Punalada veloz", "Golpe sombra")
+
+
+def testTodosEligenAntesDeLaRonda():
+    # Los héroes deciden al empezar la ronda: la política ve a todos con la
+    # vida que tenían antes de cualquier turno, aunque el jefe pegue primero.
+    crom = m.reparar(jefeDe(puntos=[200, 200, 200, 200, 200, 500]))
+    vistas = []
+
+    def anotar(i, est, opciones):
+        vistas.append((est["ronda"], i, list(est["hp"])))
+        return m.decidir_accion(i, est)
+    reg = []
+    m.simular(crom, m.EQUIPO_BASE, 0, registro=reg, politica=anotar)
+    for ronda in {r for r, _, _ in vistas}:
+        deLaRonda = [hp for r, _, hp in vistas if r == ronda]
+        assert all(hp == deLaRonda[0] for hp in deLaRonda)
+
+
+def testLaPocionApartadaDeUnCaidoSeLibera():
+    # Quien aparta una poción la usa o, si cae antes, la ronda siguiente vuelve
+    # a estar libre: nunca se gastan más de las que hay ni alguien se queda buscando.
+    crom = m.reparar(jefeDe(puntos=[200, 400, 150, 400, 150, 200]))
+    for semilla in range(20):
+        reg = []
+        m.simular(crom, m.EQUIPO_BASE, semilla, registro=reg)
+        usadas = sum(1 for ev in reg if ev["tipo"] == "turno" and ev["accion"].startswith(("Bebe", "Le da")))
+        buscadas = sum(1 for ev in reg if ev["tipo"] == "turno" and ev["accion"].startswith("Busca"))
+        assert usadas <= sum(m.pocionesIniciales.values()) and buscadas == 0
+
+
+def testCadaClaseJuegaSuPapel():
+    # Equipo base: Guerrero, Tanque, Mago y Clérigo, todos llenos.
+    est = estadoDePrueba()
+    # El Guerrero usa su técnica que más pega mientras le alcanza el maná
+    assert m.decidir_accion(0, est)[0] == "conjuro"
+    est["sp"][0] = 5
+    assert m.decidir_accion(0, est) == ("basico", None, None)
+    # El Tanque mantiene su Muralla arriba
+    assert m.decidir_accion(1, est) == ("conjuro", 0, None)
+    est["buffDef"][1] = 2
+    assert m.decidir_accion(1, est) == ("basico", None, None)
+    # El Mago lanza magia, no el ataque básico
+    assert m.decidir_accion(2, est)[0] == "conjuro"
+    # El Clérigo con todos llenos pega; con alguien en 75% ya lo cura
+    assert m.decidir_accion(3, est) == ("basico", None, None)
+    est["hp"][0] = int(0.75 * est["equipo"][0]["hp"])
+    assert m.decidir_accion(3, est) == ("conjuro", 0, 0)
+
+
+def testNadieSeEncimaSobreElMismoAliado():
+    # El Mago está por caer. El Clérigo elige curarlo; el Guerrero, que va
+    # bien, ya no le gasta una poción porque el Mago ya va a ser atendido.
+    est = estadoDePrueba()
+    est["hp"][2] = 40
+    assert m.elegirAccion(3, est, None) == ("conjuro", 1, 2)
+    assert est["atendidos"] == [2]
+    assert m.decidir_accion(0, est)[0] != "pocion"
+    # Sin nadie que lo cure, el Guerrero sí le pasa una poción
+    est["atendidos"] = []
+    assert m.decidir_accion(0, est) == ("pocion", "hpGrande", 2)
+
+
+def testLosAtaquesDeAreaSalenMenos():
+    # Ventana con un ataque de área (8, Onda de choque) y tres a uno solo, todos
+    # con el mismo peso: el de área pesa 0.3 contra 1 de cada uno de los otros.
+    est = estadoDePrueba(jefeDe(habs=[8, 0, 1, 2, 3, 4, 5, 6], pesos=[0] * 8))
+    # La ruleta suma 0.3 + 3 = 3.3; 0.08 x 3.3 = 0.26 cae en el de área y 0.1 x 3.3 = 0.33 ya no
+    assert m.elegirDeLaCola(est, RNGFijo(0.08)) == 0
+    est = estadoDePrueba(jefeDe(habs=[8, 0, 1, 2, 3, 4, 5, 6], pesos=[0] * 8))
+    assert m.elegirDeLaCola(est, RNGFijo(0.1)) == 1
+
+
+def testLaPredisposicionPesaMenos():
+    # Predisposición 7 contra 0: con la base de 2 son 9 contra 2, no 8 contra 1.
+    est = estadoDePrueba(jefeDe(predisposicion=[7, 0, 0, 0, 0, 0]))
+    # Pesos: Guerrero 9, Tanque 2 x 3.5 de provocación = 7, Mago 2, Clérigo 2;
+    # el Guerrero se lleva 9 de 20
+    assert m.objetivo_jefe(est, RNGFijo(0.44)) == 0
+    assert m.objetivo_jefe(est, RNGFijo(0.46)) == 1
+
+
+def testLaFase2CortaLaRonda():
+    # En cuanto el jefe baja de la mitad se transforma y la ronda termina: lo
+    # siguiente en el registro es una ronda nueva, con los héroes eligiendo otra vez.
+    crom = m.reparar(jefeDe(puntos=[150, 250, 250, 250, 250, 350]))
+    vistas = 0
+    for semilla in range(10):
+        reg = []
+        m.simular(crom, m.EQUIPO_BASE, semilla, registro=reg)
+        fases = [k for k, ev in enumerate(reg) if ev["tipo"] == "fase2"]
+        vistas += len(fases)
+        for k in fases:
+            assert reg[k - 1]["tipo"] == "turno" and reg[k - 1]["actor"] != "Jefe"
+            assert k + 1 == len(reg) or reg[k + 1]["tipo"] == "ronda"
+    assert vistas > 0
+
+
+def testLaCuraSeRedirigeSiElAliadoCae():
+    # El clérigo eligió curar al Mago, pero el Mago cayó antes de su turno:
+    # la cura va al aliado vivo más herido.
+    est = estadoDePrueba()
+    est["hp"] = [100, 500, 0, 300]
+    hecho = m.ejecutarAccion(3, ("conjuro", 0, 2), est, RNGFijo(0.5))
+    assert hecho["curas"] == [("Guerrero", 75)] and est["hp"][2] == 0
 
 
 # 6. El turno del jefe
@@ -309,52 +437,67 @@ def testAtaqueDeCarga():
     assert est["cargando"]["nombre"] == "Aplastamiento"
 
     # Siguiente turno: 0.0 elige al Guerrero; 0.5 no esquiva, no es crítico y da variación 1.00
-    # 225 x 2.6 x 1.00 x 100/133 = 439.8 -> 439, más que los 300 de vida del Guerrero
+    # 192 x 2.6 x 1.00 x 100/133 = 375.3 -> 375, más que los 300 que le quedan al Guerrero
+    est["hp"][0] = 300
     m.turnoJefe(est, RNGFijo(0.0, 0.5, 0.5, 0.5), reg)
     assert reg[-1]["accion"] == "Aplastamiento"
-    assert reg[-1]["golpes"] == [("Guerrero", 439, "")]
+    assert reg[-1]["golpes"] == [("Guerrero", 375, "")]
     assert reg[-1]["muertos"] == ["Guerrero"] and est["hp"][0] == 0
     assert est["cargando"] is None and est["primera_muerte"] == 0
 
 
-def testElJefeBloquea():
-    # probBloqueo 3 -> 15%. Con 0.10 bloquea y no ataca; con 0.50 ataca normal.
-    est = estadoDePrueba(jefeDe(probBloqueo=3))
+def testElJefeNoBloquea():
+    # Desde la etapa 7 el jefe ya no gasta turnos en cubrirse: aunque la ruleta
+    # salga en 0, siempre ataca.
+    est = estadoDePrueba()
     reg = []
-    m.turnoJefe(est, RNGFijo(0.10), reg)
-    assert est["guardia"] and reg[-1]["accion"] == "Bloquea" and reg[-1]["golpes"] == []
-    m.turnoJefe(est, RNGFijo(0.50), reg)
-    assert not est["guardia"] and len(reg[-1]["golpes"]) == 1
+    for _ in range(6):
+        m.turnoJefe(est, RNGFijo(0.0, 0.5, 0.5, 0.5), reg)
+        assert reg[-1]["accion"] != "Bloquea"
+    assert "probBloqueo" not in m.reparar(jefeParejo)
 
 
 def testPredisposicion():
-    # Predisposición 7 al Tanque y 0 al resto: pesos 8 contra 1, 1 y 1 (total 11)
+    # Predisposición 7 al Tanque y 0 al resto. El Tanque además provoca: su peso
+    # se multiplica por 3.5 -> (7 + 1) x 3.5 = 28 contra 1, 1 y 1 (total 31)
     est = estadoDePrueba(jefeDe(predisposicion=[0, 7, 0, 0, 0, 0]))
-    assert m.objetivo_jefe(est, RNGFijo(0.05)) == 0      # 0.55 cae en el Guerrero
-    assert m.objetivo_jefe(est, RNGFijo(0.50)) == 1      # 5.5 pasa al Guerrero y cae en el Tanque
-    assert m.objetivo_jefe(est, RNGFijo(0.95)) == 3      # 10.45 llega hasta el Clérigo
+    assert m.objetivo_jefe(est, RNGFijo(0.02)) == 0      # 0.62 cae en el Guerrero
+    assert m.objetivo_jefe(est, RNGFijo(0.50)) == 1      # 15.5 pasa al Guerrero y cae en el Tanque
+    assert m.objetivo_jefe(est, RNGFijo(0.99)) == 3      # 30.69 llega hasta el Clérigo
     # Con el Tanque caído quedan tres pesos de 1: 0.5 x 3 = 1.5 cae en el segundo vivo
     est["hp"][1] = 0
     assert m.objetivo_jefe(est, RNGFijo(0.50)) == 2
 
 
+def testElTanqueProvoca():
+    # Sin predisposición los pesos son 1, 3.5, 1 y 1 (total 6.5): el Tanque recibe
+    # 3.5 / 6.5 = 54% de los ataques a un solo objetivo. Cae en él todo número
+    # entre 1/6.5 = 0.154 y 4.5/6.5 = 0.692
+    est = estadoDePrueba()
+    assert [h["provocacion"] for h in est["equipo"]] == [1.0, 3.5, 1.0, 1.0]
+    assert m.objetivo_jefe(est, RNGFijo(0.15)) == 0
+    assert m.objetivo_jefe(est, RNGFijo(0.16)) == 1
+    assert m.objetivo_jefe(est, RNGFijo(0.69)) == 1
+    assert m.objetivo_jefe(est, RNGFijo(0.70)) == 2
+
+
 def testFase2CambiaObjetoStatsYCola():
     # ajustes [3,0,1,2,3] -> ataque x1.15, defensa x0.85, ataque mágico x0.95,
     # defensa mágica x1.05, velocidad x1.15. La vida máxima no cambia.
-    #   225 x 1.15 = 258.75 -> 258 | 83 x 0.85 = 70.55 -> 70 | 225 x 0.95 = 213.75 -> 213
+    #   192 x 1.15 = 220.8 -> 220 | 83 x 0.85 = 70.55 -> 70 | 192 x 0.95 = 182.4 -> 182
     #   83 x 1.05 = 87.15 -> 87    | 25 x 1.15 = 28.75
     # cambios: la posición 0 pasa al ataque 8 y la 7 al ataque 30
     crom = jefeDe(objeto2=5, ajustes=[3, 0, 1, 2, 3])
-    assert m.statsFase2(crom) == {"hp": 875, "atk": 258, "defe": 70, "atkMag": 213,
+    assert m.statsFase2(crom) == {"hp": 1375, "atk": 220, "defe": 70, "atkMag": 182,
                                   "defMag": 87, "vel": pytest.approx(28.75)}
     assert m.colaFase2(crom) == [8, 1, 2, 3, 4, 5, 6, 30]
 
     est = estadoDePrueba(crom)
-    est["hp_jefe"] = 437          # la mitad de 875 es 437.5
+    est["hp_jefe"] = 687          # la mitad de 1375 es 687.5
     reg = []
     m.turnoJefe(est, RNGFijo(0.5), reg)
     assert est["ronda_fase2"] == 0 and est["objJefe"] is m.objetos[5]
-    assert est["jefe"]["atk"] == 258 and est["ataques"] == [8, 1, 2, 3, 4, 5, 6, 30]
+    assert est["jefe"]["atk"] == 220 and est["ataques"] == [8, 1, 2, 3, 4, 5, 6, 30]
     assert reg[0]["tipo"] == "fase2" and reg[0]["nuevos"] == ["Onda de choque", "Rayo final"]
 
 
@@ -364,7 +507,7 @@ def testElAutomaticoRespondeALaCarga():
     # El Tanque prepara su bloqueo total; el Guerrero sano sigue atacando y herido bloquea
     assert m.decidir_accion(1, est) == ("conjuro", 1, None)
     assert m.decidir_accion(0, est)[0] != "bloquear"
-    est["hp"][0] = 120            # 40% de 300, y arriba de 30% para que no pida poción
+    est["hp"][0] = 152            # 40% de 380, y arriba de 30% para que no pida poción
     assert m.decidir_accion(0, est) == ("bloquear", None, None)
 
 
@@ -389,7 +532,7 @@ def test_fase2_ocurre():
 
 def test_registro_no_cambia_el_combate():
     # Activar el registro no debe alterar ningún número.
-    crom = m.reparar(jefeDe(puntos=[3, 2, 2, 1, 2, 2], probBloqueo=2))
+    crom = m.reparar(jefeDe(puntos=[3, 2, 2, 1, 2, 2]))
     for semilla in range(4):
         for eq in m.EQUIPOS.values():
             assert m.simular(crom, eq, semilla) == m.simular(crom, eq, semilla, registro=[])
@@ -398,9 +541,9 @@ def test_registro_no_cambia_el_combate():
 def test_politica_equivalente_da_el_mismo_combate():
     # El modo interactivo cambia quién decide, no las reglas. Si la política hace
     # lo mismo que el jugador automático, el combate debe salir idéntico.
-    def comoElAutomatico(i, est, opciones, enVentana):
-        accion = m.decidirPrioridad(i, est) if enVentana else m.decidir_accion(i, est)
-        assert accion is None or accion in opciones
+    def comoElAutomatico(i, est, opciones):
+        accion = m.decidir_accion(i, est)
+        assert accion in opciones
         return accion
 
     crom = m.reparar(jefeDe(puntos=[3, 2, 2, 1, 2, 2], habs=[28, 29, 30, 31, 0, 12, 20, 8]))
@@ -409,11 +552,26 @@ def test_politica_equivalente_da_el_mismo_combate():
             assert m.simular(crom, eq, semilla) == m.simular(crom, eq, semilla, politica=comoElAutomatico)
 
 
+def ultimaVida(reg, hasta):
+    vida = reg[0]["hp_equipo"]
+    for ev in reg[:hasta]:
+        if "hp_equipo" in ev:
+            vida = ev["hp_equipo"]
+    return vida
+
+
 def test_registro_cuadra_con_el_resultado():
     crom = m.reparar(jefeDe(puntos=[3, 2, 2, 1, 2, 2]))
     reg = []
     r = m.simular(crom, m.EQUIPO_BASE, 0, registro=reg)
-    assert reg[0]["tipo"] == "inicio" and reg[0]["hp_equipo"] == [300, 480, 210, 300]
+    assert reg[0]["tipo"] == "inicio" and reg[0]["hp_equipo"] == [380, 562, 266, 380]
+    # Cada ronda empieza con lo que eligió cada héroe vivo, antes de cualquier turno
+    for k, ev in enumerate(reg):
+        if ev["tipo"] == "ronda":
+            planes = reg[k + 1]
+            assert planes["tipo"] == "planes" and planes["ronda"] == ev["ronda"]
+            vivos = [n for n, h in zip(reg[0]["equipo"], ultimaVida(reg, k)) if h > 0]
+            assert sorted(planes["acciones"]) == sorted(vivos)
     turnos = [e for e in reg if e["tipo"] == "turno"]
     assert turnos[-1]["hp_equipo"] == r["hp_equipo"]
     assert max(e["ronda"] for e in reg if e["tipo"] == "ronda") == r["rondas"]
@@ -426,9 +584,9 @@ def _res(gana, hp_pct, rondas):
 
 
 def test_fitness_perfecto():
-    # 6 de 10 victorias con 20% de vida, 10 rondas, uso uniforme
+    # 6 de 10 victorias con 20% de vida, 14 rondas, uso uniforme
     # f_win = 1, margen = 1, duración = 1, variedad = 2/2 = 1  -> fitness = 1.0
-    res = [_res(True, 0.20, 10)] * 6 + [_res(False, 0.0, 10)] * 4
+    res = [_res(True, 0.20, 14)] * 6 + [_res(False, 0.0, 14)] * 4
     f = m.calcular_fitness(res)
     assert f["fitness"] == pytest.approx(1.0)
 
@@ -437,10 +595,10 @@ def test_fitness_fuera_de_banda_y_margen():
     # Banda media = 40-60%. 9 de 10 victorias -> p = 0.9
     # distancia a la banda: d = 0.9 - 0.60 = 0.30 -> f_win = 1 - 2(0.30) = 0.40
     # vida final 60%: margen = 1 - |0.6-0.2|/0.8 = 0.5
-    # 13 rondas: duración = exp(-(13-10)^2 / (2x3^2)) = exp(-0.5) = 0.6065
+    # 17 rondas: duración = exp(-(17-14)^2 / (2x3^2)) = exp(-0.5) = 0.6065
     # variedad: usos [1,1,1,1] -> H = 2 bits -> 2/2 = 1
     # fitness = 0.40 x (0.5x0.5 + 0.25x0.6065 + 0.25x1) = 0.40 x 0.6516 = 0.2607
-    res = [_res(True, 0.60, 13)] * 9 + [_res(False, 0.0, 13)]
+    res = [_res(True, 0.60, 17)] * 9 + [_res(False, 0.0, 17)]
     f = m.calcular_fitness(res)
     assert f["f_win"] == pytest.approx(0.4)
     assert f["margen"] == pytest.approx(0.5)
@@ -452,7 +610,7 @@ def test_fitness_extremos_quedan_abajo():
     # Jefe invencible (0 victorias): d = 0.40 -> f_win = 0.20
     #   margen = 0 (no hay victorias); duración = 1; variedad = 1
     #   fitness = 0.20 x (0.5x0 + 0.25x1 + 0.25x1) = 0.10
-    invencible = [_res(False, 0.0, 10)] * 10
+    invencible = [_res(False, 0.0, 14)] * 10
     f_inv = m.calcular_fitness(invencible)
     assert f_inv["f_win"] == pytest.approx(0.2)
     assert f_inv["fitness"] == pytest.approx(0.10)
@@ -461,7 +619,7 @@ def test_fitness_extremos_quedan_abajo():
     trivial = [_res(True, 0.95, 2)] * 10
     assert m.calcular_fitness(trivial)["f_win"] == pytest.approx(0.2)
 
-    en_banda = [_res(True, 0.20, 10)] * 5 + [_res(False, 0.0, 10)] * 5
+    en_banda = [_res(True, 0.20, 14)] * 5 + [_res(False, 0.0, 14)] * 5
     assert m.calcular_fitness(en_banda)["fitness"] > 5 * f_inv["fitness"]
 
 

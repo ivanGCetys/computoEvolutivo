@@ -155,7 +155,7 @@ def hipervolumenDelFrente(objs, viols):
 
 def correrNsga2(semillaRng=0, tamPoblacion=30, generaciones=10, probCruce=0.9,
                 tasaMut=1 / g.N_BITS, nSim=m.combatesPorEquipo, semillaSim=0,
-                rotarSemillas=True, verbose=False):
+                rotarSemillas=True, verbose=False, alAvanzar=None):
     # Devuelve el frente final como lista de (bits, objetivos, violación) y la
     # historia como pares de (evaluaciones acumuladas, hipervolumen del frente).
     #
@@ -164,6 +164,11 @@ def correrNsga2(semillaRng=0, tamPoblacion=30, generaciones=10, probCruce=0.9,
     # tener suerte con unos combates en particular. El costo es que los padres
     # se tienen que volver a evaluar para compararlos con sus hijos en los mismos
     # combates, así que cada generación gasta el doble de evaluaciones.
+    #
+    # alAvanzar, si se da, se llama al terminar cada generación con el número
+    # de generación, las evaluaciones, el hipervolumen y los objetivos y
+    # violaciones de la población. Solo sirve para mostrar el avance; no cambia
+    # nada del algoritmo.
     rng = random.Random(semillaRng)
     pob = [g.bits_al_azar(rng) for _ in range(tamPoblacion)]
     objs, viols = evaluarPoblacion(pob, nSim, semillaSim)
@@ -193,6 +198,8 @@ def correrNsga2(semillaRng=0, tamPoblacion=30, generaciones=10, probCruce=0.9,
         historia.append((evals, hv))
         if verbose:
             print("gen %2d  evals %4d  hipervolumen %.4f" % (gen, evals, hv))
+        if alAvanzar is not None:
+            alAvanzar(gen, evals, hv, objs, viols)
 
     # Dos cromosomas distintos pueden decodificar al mismo jefe, y en el frente
     # final solo interesa uno de cada uno.
@@ -218,6 +225,16 @@ def elegirDelFrente(frente):
     # el algoritmo de un solo objetivo. Se prefiere a los que cumplen la
     # restricción y, entre ellos, al de mejor nota aproximada.
     return max(frente, key=lambda t: (t[2] == 0, notaAproximada(t[1])))
+
+
+def elegirParaJugar(frente, cuantos=5, n=30, semilla=7000):
+    # El jefe contra el que se juega. Los objetivos del frente se midieron con
+    # pocos combates y traen mucho ruido, así que de los mejores según
+    # elegirDelFrente se vuelve a medir a cada uno con combates nuevos y se
+    # queda el que mejor sale. Usa semillas distintas a las de la validación
+    # para que el número que se reporta después no salga inflado por escoger.
+    candidatos = sorted(frente, key=lambda t: (t[2] == 0, notaAproximada(t[1])), reverse=True)[:cuantos]
+    return max(candidatos, key=lambda t: m.evaluar_jefe(g.decodificar(t[0]), n=n, semilla=semilla)["fitness"])
 
 
 if __name__ == "__main__":

@@ -6,10 +6,12 @@ import random
 from reglas import *
 from clases import EQUIPO_BASE, sortearConjuros
 from jefe import *
-from heuristico import decidir_accion, decidirPrioridad
+from heuristico import decidir_accion
 
 RONDAS_MAX = 40
 umbralFase2 = 0.5
+basePredisposicion = 2
+pesoArea = 0.3
 
 
 def crearEstado(crom, equipo, rng):
@@ -27,52 +29,51 @@ def crearEstado(crom, equipo, rng):
             "bloq": [False] * n, "bloqueoTotal": [False] * n,
             "buffAtk": [0] * n, "multBuffAtk": [1.0] * n,
             "buffDef": [0] * n, "multBuffDef": [1.0] * n,
-            "pociones": dict(pocionesIniciales),
-            "hp_jefe": jefe["hp"], "objJefe": objetos[crom["objeto1"]], "guardia": False,
+            "pociones": dict(pocionesIniciales), "reservadas": {k: 0 for k in pocionesIniciales}, "atendidos": [],
+            "hp_jefe": jefe["hp"], "objJefe": objetos[crom["objeto1"]],
             "ronda": 0, "ronda_fase2": None, "primera_muerte": None,
             "cola": list(range(tamanoCola)), "ataques": list(crom["habs"]),
             "cargando": None, "usos": [0] * tamanoCola}
 
 
-def accionesLegales(i, est, soloPrioridad=False):
+def ayudaria(clave, j, est):
+    # Si una poción le serviría de algo al héroe j: la de vida si le falta
+    # vida, la de maná si le falta maná y tiene conjuros en qué gastarlo.
+    heroe = est["equipo"][j]
+    if est["hp"][j] <= 0:
+        return False
+    if clave.startswith("hp"):
+        return est["hp"][j] < heroe["hp"]
+    return bool(heroe["conjuros"]) and est["sp"][j] < heroe["sp"]
+
+
+def accionesLegales(i, est):
     yo, sp = est["equipo"][i], est["sp"][i]
     vivos = [j for j in range(len(est["equipo"])) if est["hp"][j] > 0]
-    ops = [] if soloPrioridad else [("basico", None, None)]
+    ops = [("basico", None, None)]
 
     for k, conj in enumerate(yo["conjuros"]):
-        if sp < conj["costo"] or (soloPrioridad and not conj["prioridad"]):
+        if sp < conj["costo"]:
             continue
         if conj["tipo"] == "cura" and not conj["enGrupo"]:
             ops.extend(("conjuro", k, j) for j in vivos)
         else:
             ops.append(("conjuro", k, None))
 
-    if soloPrioridad:
-        return ops
-
     ops.append(("bloquear", None, None))
 
-    # Una poción solo se ofrece si de verdad recuperaría algo.
-    faltaVida = est["hp"][i] < yo["hp"]
-    faltaMana = sp < yo["sp"]
+    # Las pociones son de todo el equipo: cualquiera puede darle una a
+    # cualquier aliado vivo al que le sirva. Las que ya apartó otro héroe en
+    # esta misma ronda no cuentan.
     for clave, cuantas in est["pociones"].items():
-        if cuantas > 0 and (faltaVida if clave.startswith("hp") else faltaMana):
-            ops.append(("pocion", clave, None))
+        if cuantas - est["reservadas"][clave] > 0:
+            ops.extend(("pocion", clave, j) for j in vivos if ayudaria(clave, j, est))
     return ops
 
 
-def puedeAdelantarse(i, est):
-    # La ventana de prioridad solo tiene sentido si alguien vivo actuaría antes.
-    yo = est["equipo"][i]
-    if not any(c["prioridad"] and est["sp"][i] >= c["costo"] for c in yo["conjuros"]):
-        return False
-
-    for a in est["actores"]:
-        if a == i:
-            return False
-        if a == "J" or est["hp"][a] > 0:
-            return True
-    return False
+def esPrioridad(accion, est, i):
+    tipo, cual, _ = accion
+    return tipo == "conjuro" and est["equipo"][i]["conjuros"][cual].get("prioridad", False)
 
 
 def atacarJefe(i, poder, esFisico, elem, est, rng):
@@ -82,9 +83,8 @@ def atacarJefe(i, poder, esFisico, elem, est, rng):
     if est["buffAtk"][i] > 0:
         atk = atk * est["multBuffAtk"][i]
 
-    bloqueo = multBloqueo if est["guardia"] else 1.0
     dano, nota = danoAtaque(rng, atk, poder, esFisico, elem, yo["objeto"], defensa, est["objJefe"],
-                            yo["vel"], jefe["vel"], bloqueo, yo["minFis"], yo["probCritico"])
+                            yo["vel"], jefe["vel"], 1.0, yo["minFis"], yo["probCritico"])
     est["hp_jefe"] -= dano
     return dano, nota
 
@@ -109,13 +109,34 @@ def atacarHeroe(j, poder, esFisico, elem, est, rng):
     return dano, nota
 
 
+def proteccionesActivas(est):
+    # Lo que reduce el daño que recibe cada héroe en este momento, para que la
+    # pantalla lo muestre exactamente mientras dura. Solo va al registro.
+    activas = []
+    for j in range(len(est["equipo"])):
+        tipos = []
+        if est["hp"][j] > 0:
+            if est["bloqueoTotal"][j]:
+                tipos.append("total")
+            if est["buffDef"][j] > 0:
+                tipos.append("defensa")
+            if est["bloq"][j]:
+                tipos.append("bloqueo")
+        activas.append(tipos)
+    return activas
+
+
 def objetivo_jefe(est, rng):
     # Ruleta entre los héroes vivos con la predisposición del jefe hacia cada
-    # clase. Se le suma 1 a cada gen para que ninguna clase quede en cero.
+    # clase. A cada gen (de 0 a 7) se le suma una base: con 2, la clase
+    # preferida sale a lo mucho 4.5 veces más que la que menos; con 1 eran ocho
+    # veces y el jefe podía ensañarse con una sola clase. Con una base más alta
+    # el jefe ya no alcanza a emparejar a los 15 equipos y F baja. El peso se
+    # multiplica por la provocación del héroe, que solo el Tanque tiene arriba de 1.
     hp, equipo = est["hp"], est["equipo"]
     pred = est["crom"]["predisposicion"]
     vivos = [j for j in range(len(hp)) if hp[j] > 0]
-    pesos = [pred[equipo[j]["indiceClase"]] + 1 for j in vivos]
+    pesos = [(pred[equipo[j]["indiceClase"]] + basePredisposicion) * equipo[j]["provocacion"] for j in vivos]
 
     r = rng.random() * sum(pesos)
     for j, w in zip(vivos, pesos):
@@ -123,6 +144,15 @@ def objetivo_jefe(est, rng):
         if r < 0:
             return j
     return vivos[-1]
+
+
+def objetivoVivo(j, est):
+    # Las acciones se eligen al empezar la ronda. Si el aliado elegido cayó
+    # antes de que le toque, la cura o la poción va al aliado vivo más herido.
+    if est["hp"][j] > 0:
+        return j
+    vivos = [k for k in range(len(est["equipo"])) if est["hp"][k] > 0]
+    return min(vivos, key=lambda k: (est["hp"][k] / est["equipo"][k]["hp"], k))
 
 
 def ejecutarAccion(i, accion, est, rng):
@@ -141,14 +171,20 @@ def ejecutarAccion(i, accion, est, rng):
         est["bloq"][i] = True
 
     elif tipo == "pocion":
-        est["pociones"][cual] -= 1
-        hecho["accion"] = "Bebe " + nombrePocion[cual]
-        if cual.startswith("hp"):
-            antes = est["hp"][i]
-            est["hp"][i] = min(yo["hp"], antes + int(efectoPocion[cual] * yo["hp"]))
-            hecho["curas"].append((yo["nombre"], est["hp"][i] - antes))
+        if est["pociones"][cual] <= 0:
+            # Otro se tomó la última antes; el turno se va en buscarla.
+            hecho["accion"] = "Busca una " + nombrePocion[cual]
         else:
-            est["sp"][i] = min(yo["sp"], est["sp"][i] + int(efectoPocion[cual] * yo["sp"]))
+            est["pociones"][cual] -= 1
+            j = objetivoVivo(objetivo if objetivo is not None else i, est)
+            otro = est["equipo"][j]
+            hecho["accion"] = ("Bebe " if j == i else "Le da a %s una " % otro["nombre"]) + nombrePocion[cual]
+            if cual.startswith("hp"):
+                antes = est["hp"][j]
+                est["hp"][j] = min(otro["hp"], antes + int(efectoPocion[cual] * otro["hp"]))
+                hecho["curas"].append((otro["nombre"], est["hp"][j] - antes))
+            else:
+                est["sp"][j] = min(otro["sp"], est["sp"][j] + int(efectoPocion[cual] * otro["sp"]))
 
     else:
         conj = yo["conjuros"][cual]
@@ -170,7 +206,7 @@ def ejecutarAccion(i, accion, est, rng):
         elif conj["tipo"] == "cura":
             cantidad = int(yo["atkMag"] * conj["poder"])
             curados = ([j for j in range(len(est["equipo"])) if est["hp"][j] > 0]
-                       if conj["enGrupo"] else [objetivo])
+                       if conj["enGrupo"] else [objetivoVivo(objetivo, est)])
             for j in curados:
                 antes = est["hp"][j]
                 est["hp"][j] = min(est["equipo"][j]["hp"], antes + cantidad)
@@ -188,17 +224,29 @@ def ejecutarAccion(i, accion, est, rng):
     return hecho
 
 
-def turnoHeroe(i, est, rng, registro, politica, enVentana=False):
-    # Devuelve False si el héroe prefirió esperar en la ventana de prioridad.
+def elegirAccion(i, est, politica):
+    # Lo que el héroe i decide hacer en esta ronda, con lo que sabe al empezarla.
     if politica is None:
-        accion = decidirPrioridad(i, est) if enVentana else decidir_accion(i, est)
+        accion = decidir_accion(i, est)
     else:
-        accion = politica(i, est, accionesLegales(i, est, enVentana), enVentana)
-    if accion is None:
-        return False
+        accion = politica(i, est, accionesLegales(i, est))
+    if accion[0] == "pocion":
+        if accion[2] is None:
+            accion = ("pocion", accion[1], i)
+        est["reservadas"][accion[1]] += 1
+    # A quién ya le va a llegar una cura o una poción en esta ronda, para que
+    # los demás no se encimen sobre el mismo aliado.
+    esCura = accion[0] == "conjuro" and est["equipo"][i]["conjuros"][accion[1]]["tipo"] == "cura"
+    if (accion[0] == "pocion" or esCura) and accion[2] is not None:
+        est["atendidos"].append(accion[2])
+    return accion
 
+
+def turnoHeroe(i, accion, est, rng, registro, adelantado=False):
     yo = est["equipo"][i]
     est["bloq"][i] = False
+    if accion[0] == "pocion":
+        est["reservadas"][accion[1]] -= 1
     hecho = ejecutarAccion(i, accion, est, rng)
 
     # El maná de las clases mágicas vuelve poco a poco al terminar su turno.
@@ -207,10 +255,10 @@ def turnoHeroe(i, est, rng, registro, politica, enVentana=False):
 
     if registro is not None:
         hecho.update({"tipo": "turno", "ronda": est["ronda"], "actor": yo["nombre"],
-                      "adelantado": enVentana, "muertos": [],
-                      "hp_jefe": max(0, est["hp_jefe"]), "hp_equipo": list(est["hp"])})
+                      "adelantado": adelantado, "muertos": [],
+                      "hp_jefe": max(0, est["hp_jefe"]), "hp_equipo": list(est["hp"]),
+                      "sp_equipo": list(est["sp"]), "protecciones": proteccionesActivas(est)})
         registro.append(hecho)
-    return True
 
 
 def entrarFase2(est, registro):
@@ -229,12 +277,16 @@ def entrarFase2(est, registro):
 def elegirDeLaCola(est, rng):
     # El jefe solo puede elegir entre los primeros ataques de su cola. El que
     # usa se va al final, así que tiene que pasar por los demás antes de repetirlo.
+    # Los ataques de área cuentan la mitad en la ruleta: salen menos seguido.
     cola, pesos = est["cola"], est["crom"]["pesos"]
     ventana = cola[:tamanoVentana]
 
-    r, elegido = rng.random() * sum(pesos[k] + 1 for k in ventana), ventana[-1]
+    def peso(k):
+        return (pesos[k] + 1) * (pesoArea if HABILIDADES[est["ataques"][k]]["enArea"] else 1.0)
+
+    r, elegido = rng.random() * sum(peso(k) for k in ventana), ventana[-1]
     for k in ventana:
-        r -= pesos[k] + 1
+        r -= peso(k)
         if r < 0:
             elegido = k
             break
@@ -248,7 +300,6 @@ def elegirDeLaCola(est, rng):
 def turnoJefe(est, rng, registro):
     crom, equipo, hp = est["crom"], est["equipo"], est["hp"]
     n = len(equipo)
-    est["guardia"] = False
 
     if est["ronda_fase2"] is None and est["hp_jefe"] < umbralFase2 * est["jefe"]["hp"]:
         entrarFase2(est, registro)
@@ -260,10 +311,9 @@ def turnoJefe(est, rng, registro):
         # El turno anterior se fue en cargar, así que ahora el ataque sale sin más.
         atq, est["cargando"] = est["cargando"], None
         nombre = atq["nombre"]
-    elif rng.random() < opcionesBloqueo[crom["probBloqueo"]]:
-        atq, nombre = None, "Bloquea"
-        est["guardia"] = True
     else:
+        # El jefe ya no bloquea: los algoritmos aprendían a usar el bloqueo
+        # para alargar la pelea y emparejarla sin atacar.
         atq = HABILIDADES[est["ataques"][elegirDeLaCola(est, rng)]]
         nombre = atq["nombre"]
         if atq["carga"]:
@@ -285,7 +335,8 @@ def turnoJefe(est, rng, registro):
                          "elem": elem, "golpes": golpes, "curas": [], "adelantado": False,
                          "muertos": [equipo[j]["nombre"] for j in range(n)
                                      if hp[j] == 0 and hp_antes[j] > 0],
-                         "hp_jefe": est["hp_jefe"], "hp_equipo": list(hp)})
+                         "hp_jefe": est["hp_jefe"], "hp_equipo": list(hp),
+                         "sp_equipo": list(est["sp"]), "protecciones": proteccionesActivas(est)})
 
 
 def simular(crom, equipo=EQUIPO_BASE, semilla=0, registro=None, politica=None):
@@ -293,8 +344,8 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0, registro=None, politica=None):
     # del combate para narrarlo después, sin cambiar ningún número. Si politica es
     # una función, ella decide por el equipo en lugar del jugador automático, y así
     # el modo interactivo usa las mismas reglas con las que se calificó al jefe.
-    # La política recibe el héroe, el estado, sus acciones legales y si está en
-    # la ventana de prioridad, y devuelve una de esas acciones.
+    # La política recibe el héroe, el estado y sus acciones legales al empezar
+    # la ronda, y devuelve una de esas acciones.
     rng = random.Random(semilla)
     est = crearEstado(crom, equipo, rng)
     equipo = est["equipo"]
@@ -306,7 +357,7 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0, registro=None, politica=None):
                          "objeto2": objetos[crom["objeto2"]]["nombre"],
                          "habs": [HABILIDADES[h]["nombre"] for h in crom["habs"]],
                          "equipo": [p["nombre"] for p in equipo],
-                         "hp_equipo": list(est["hp"]),
+                         "hp_equipo": list(est["hp"]), "sp_equipo": list(est["sp"]),
                          "conjuros": {p["nombre"]: [c["nombre"] for c in p["conjuros"]] for p in equipo},
                          "orden": ["Jefe" if x == "J" else equipo[x]["nombre"] for x in est["actores"]]})
 
@@ -315,25 +366,39 @@ def simular(crom, equipo=EQUIPO_BASE, semilla=0, registro=None, politica=None):
         if registro is not None:
             registro.append({"tipo": "ronda", "ronda": ronda})
 
-        # Ventana de prioridad: quien tenga un ataque que se adelanta puede
-        # usarlo antes que todos, y con eso gasta su turno de esta ronda.
-        yaActuo = [False] * n
+        # Todos los héroes eligen qué hacer antes de que pase nada, con lo que
+        # saben al empezar la ronda: nadie puede esperar a ver qué hace el jefe
+        # o a quién le pega para decidir.
+        # Si alguien apartó una poción y cayó antes de usarla, vuelve a estar libre.
+        est["reservadas"] = {k: 0 for k in pocionesIniciales}
+        est["atendidos"] = []
+        planes = {}
         for i in range(n):
-            if est["hp"][i] > 0 and puedeAdelantarse(i, est):
-                yaActuo[i] = turnoHeroe(i, est, rng, registro, politica, enVentana=True)
-                if est["hp_jefe"] <= 0:
-                    return _resultado(True, est, False)
+            if est["hp"][i] > 0:
+                planes[i] = elegirAccion(i, est, politica)
+        if registro is not None:
+            registro.append({"tipo": "planes", "ronda": ronda,
+                             "acciones": {equipo[i]["nombre"]: planes[i] for i in planes}})
 
-        for a in est["actores"]:
+        # Luego se resuelve: primero los ataques que se adelantan, después
+        # todos por velocidad.
+        adelantados = [i for i in est["actores"] if i != "J" and i in planes and esPrioridad(planes[i], est, i)]
+        orden = adelantados + [a for a in est["actores"] if a not in adelantados]
+        for a in orden:
             if a == "J":
                 turnoJefe(est, rng, registro)
                 if all(h == 0 for h in est["hp"]):
                     return _resultado(False, est, False)
-
-            elif est["hp"][a] > 0 and not yaActuo[a]:
-                turnoHeroe(a, est, rng, registro, politica)
+            elif est["hp"][a] > 0:
+                turnoHeroe(a, planes[a], est, rng, registro, a in adelantados)
                 if est["hp_jefe"] <= 0:
                     return _resultado(True, est, False)
+                if est["ronda_fase2"] is None and est["hp_jefe"] < umbralFase2 * est["jefe"]["hp"]:
+                    # Al bajar de la mitad el jefe se transforma en ese momento y
+                    # la ronda se corta: lo que faltaba por hacer ya no pasa y
+                    # todos vuelven a elegir con el jefe nuevo.
+                    entrarFase2(est, registro)
+                    break
 
     # Llegar al tope de rondas cuenta como derrota del jefe.
     return _resultado(True, est, True)
