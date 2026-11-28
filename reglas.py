@@ -70,7 +70,7 @@ PODER_BASICO = 0.8
 
 # Mochila compartida del equipo. Cada poción devuelve una fracción del máximo
 # de quien la bebe.
-pocionesIniciales = {"hpChica": 3, "hpGrande": 2, "spChica": 2, "spGrande": 1}
+pocionesIniciales = {"hpChica": 2, "hpGrande": 1, "spChica": 2, "spGrande": 1}
 efectoPocion = {"hpChica": 0.30, "hpGrande": 0.60, "spChica": 0.30, "spGrande": 0.60}
 nombrePocion = {"hpChica": "pocion de vida", "hpGrande": "pocion grande de vida",
                 "spChica": "pocion de mana", "spGrande": "pocion grande de mana"}

@@ -37,7 +37,7 @@ Los comandos van en la terminal. Todo usa semillas fijas, así que los números 
 
 | Paso | Comando | Qué debe salir | Tiempo |
 |---|---|---|---|
-| 1 | `python -m pytest -q` | 96 passed | 50 s |
+| 1 | `python -m pytest -q` | 95 passed | 50 s |
 | 2 | `python genetico.py` | Termina con F = 0.8110 | 60 s |
 | 3 | `python nsga2.py` | Un frente de 7 jefes con hipervolumen 0.4268 | 60 s |
 | 4 | `python narrar.py resumen` | Un combate, una línea por ronda | 1 s |
@@ -109,7 +109,7 @@ Al equipo lo controla un jugador automático durante la evaluación (`heuristico
 
 **Entrenar jefe.** Corre NSGA-II con el presupuesto completo del experimento: 30 jefes, 30 generaciones con semillas rotativas, unas 1,830 evaluaciones de 150 combates cada una. Corre en un proceso aparte, así que la ventana sigue respondiendo y muestra en vivo el hipervolumen de cada generación, la población sobre dos de sus objetivos y una bitácora. Al terminar toma los cinco mejores del frente según el criterio de `nsga2.py`, vuelve a medir a cada uno con 30 combates nuevos por equipo (los objetivos del frente traen mucho ruido), se queda con el que mejor sale, lo valida con otros 30 combates por equipo y lo guarda en `jefe_optimo.json`. El jefe marcado en `frente.json` se escoge igual. En una máquina de 2 núcleos tarda unos dos minutos y medio; con la semilla 11 el jefe quedó con F = 0.750 validada, el equipo le gana el 44 % de las veces y los combates duran 14.3 rondas en promedio. Cada entrenamiento usa una semilla distinta, así que el jefe cambia de una vez a otra. También se puede correr sin ventana con `python entrenamiento.py`.
 
-**Jugar.** Ya no hay que elegir jefe: se juega contra el último que se entrenó, y si todavía no hay ninguno, contra el que eligió NSGA-II en la corrida guardada en `frente.json`. A ese jefe se le sumaron a mano 100 de vida después de elegirlo (el campo `vidaExtra` de `frente.json` y `mejor_jefe.json`, que la búsqueda nunca toca), para que la pelea dure un poco más; pasa de 946 a 1046. Los números de este README sobre el jefe del juego son de antes de sumársela. La pantalla de equipo muestra las seis clases con sus atributos, conjuros y objeto; se eligen cuatro y abajo aparecen el equipo y la ficha del jefe.
+**Jugar.** Ya no hay que elegir jefe: se juega contra el último que se entrenó, y si todavía no hay ninguno, contra el que eligió NSGA-II en la corrida guardada en `frente.json`. La pantalla de equipo muestra las seis clases con sus atributos, conjuros y objeto; se eligen cuatro y abajo aparecen el equipo y la ficha del jefe.
 
 **Combate.** El motor corre en un hilo aparte y se detiene cada vez que le toca decidir al jugador, así que las reglas y los números son los de la evaluación; hay una prueba que lo comprueba combate contra combate. Al empezar cada ronda se eligen las acciones de los cuatro héroes, uno tras otro, y sobre los que ya eligieron queda escrito lo que van a hacer; luego corre la ronda completa. El menú va por categorías (Ataque, Magia, Bloqueo y Objetos) con una mano que señala la opción y una flecha junto al héroe que está eligiendo. Las curas individuales y las pociones piden además a quién van, con la mano sobre ese aliado. Mientras corre la ronda, el menú se cambia por un cuadro de diálogo que cuenta lo que pasa. Escape abre la pausa, con el volumen de la música y de los efectos.
 

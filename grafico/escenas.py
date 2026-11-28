@@ -326,12 +326,14 @@ def descripcionDeDestino(clave, j, est):
     aliado = est["equipo"][j]
     deVida = clave.startswith("hp")
     cantidad = int(m.efectoPocion[clave] * (aliado["hp"] if deVida else aliado["sp"]))
-    if deVida:
-        tiene = "Tiene %d de %d de vida." % (est["hp"][j], aliado["hp"])
+    actual, maximo = (est["hp"][j], aliado["hp"]) if deVida else (est["sp"][j], aliado["sp"])
+    que = "vida" if deVida else "mana"
+    lineas = [m.nombrePocion[clave].capitalize() + " a " + aliado["nombre"], "Tiene %d de %d de %s." % (actual, maximo, que)]
+    if actual >= maximo:
+        lineas.append("Ya la tiene llena: la poción se desperdiciaría.")
     else:
-        tiene = "Tiene %d de %d de mana." % (est["sp"][j], aliado["sp"])
-    return [m.nombrePocion[clave].capitalize() + " a " + aliado["nombre"], tiene,
-            "Le devuelve %d de %s." % (cantidad, "vida" if deVida else "mana")]
+        lineas.append("Le devuelve %d de %s." % (min(cantidad, maximo - actual), que))
+    return lineas
 
 
 def textoDePlan(accion, est, i):
@@ -747,11 +749,6 @@ class EscenaCombate(Escena):
                 self.verResultados()
                 return
 
-        if self.botonesMenu:
-            raton = pygame.mouse.get_pos()
-            for boton, lineas in zip(self.botonesMenu, self.descripciones):
-                if boton.rect.collidepoint(raton):
-                    self.descripcion = lineas
 
     def mostrarEvento(self, ev):
         # Pone en pantalla un evento del registro y devuelve cuánto tiempo extra
@@ -951,7 +948,7 @@ class EscenaCombate(Escena):
             hayPociones = any(pocionesLibres(est, c) > 0 for c in m.pocionesIniciales)
             entradas.append(("Objetos", bool(grupos["objetos"]), lambda: self.armarMenu("objetos"),
                              ["Objetos", "Las pociones que comparte todo el equipo.",
-                              "Se le pueden dar a cualquier aliado que la necesite." if hayPociones
+                              "Se le pueden dar a cualquier aliado." if hayPociones
                               else "Ya no queda ninguna."]))
 
         elif nivel == "magia":
@@ -971,7 +968,7 @@ class EscenaCombate(Escena):
                     entradas.append(("%s (%d)" % (m.nombrePocion[clave].capitalize(), pocionesLibres(est, clave)),
                                      True, lambda clave=clave: self.armarMenu("destino", clave), lineas))
                 else:
-                    motivo = "Ya no queda." if pocionesLibres(est, clave) <= 0 else "Ahora no le serviría a nadie."
+                    motivo = "Ya no queda."
                     entradas.append(("%s (%d)" % (m.nombrePocion[clave].capitalize(), max(0, pocionesLibres(est, clave))),
                                      False, None, lineas + [motivo]))
 

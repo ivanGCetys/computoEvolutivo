@@ -36,17 +36,6 @@ def crearEstado(crom, equipo, rng):
             "cargando": None, "usos": [0] * tamanoCola}
 
 
-def ayudaria(clave, j, est):
-    # Si una poción le serviría de algo al héroe j: la de vida si le falta
-    # vida, la de maná si le falta maná y tiene conjuros en qué gastarlo.
-    heroe = est["equipo"][j]
-    if est["hp"][j] <= 0:
-        return False
-    if clave.startswith("hp"):
-        return est["hp"][j] < heroe["hp"]
-    return bool(heroe["conjuros"]) and est["sp"][j] < heroe["sp"]
-
-
 def accionesLegales(i, est):
     yo, sp = est["equipo"][i], est["sp"][i]
     vivos = [j for j in range(len(est["equipo"])) if est["hp"][j] > 0]
@@ -63,11 +52,12 @@ def accionesLegales(i, est):
     ops.append(("bloquear", None, None))
 
     # Las pociones son de todo el equipo: cualquiera puede darle una a
-    # cualquier aliado vivo al que le sirva. Las que ya apartó otro héroe en
-    # esta misma ronda no cuentan.
+    # cualquier aliado vivo mientras queden, aunque esté lleno, como en
+    # cualquier RPG; decidir si conviene es cosa del jugador. Las que ya apartó
+    # otro héroe en esta misma ronda no cuentan.
     for clave, cuantas in est["pociones"].items():
         if cuantas - est["reservadas"][clave] > 0:
-            ops.extend(("pocion", clave, j) for j in vivos if ayudaria(clave, j, est))
+            ops.extend(("pocion", clave, j) for j in vivos)
     return ops
 
 

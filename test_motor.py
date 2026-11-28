@@ -153,15 +153,6 @@ def testBancoDeAtaques():
 
 
 # 4. Clases y equipos
-def testVidaExtraDelJefeDelJuego():
-    # Al jefe que se juega se le pueden sumar puntos de vida a mano; la
-    # reparación los conserva y la fase 2 se mide contra la vida ya sumada.
-    crom = m.reparar(jefeDe(vidaExtra=200))
-    assert crom["vidaExtra"] == 200
-    assert m.stats_jefe(crom)["hp"] == 1375 + 200 and m.statsFase2(crom)["hp"] == 1575
-    assert "vidaExtra" not in m.reparar(jefeParejo)
-
-
 def testClasesRepartenElMismoTope():
     for nombre in m.nombresClases:
         assert sum(m.tablaClases[nombre]["puntos"]) == m.topePuntosHeroe
@@ -225,7 +216,7 @@ def testPociones():
     m.ejecutarAccion(2, ("pocion", "hpGrande", None), est, RNGFijo(0.5))    # 60% de 70 x 3.8 = 266 -> 159
     m.ejecutarAccion(2, ("pocion", "spChica", None), est, RNGFijo(0.5))     # 30% de 100 = 30
     assert est["hp"][2] == 169 and est["sp"][2] == 30
-    assert est["pociones"] == {"hpChica": 3, "hpGrande": 1, "spChica": 1, "spGrande": 1}
+    assert est["pociones"] == {"hpChica": 2, "hpGrande": 0, "spChica": 1, "spGrande": 1}
     # Son de todo el equipo: el Guerrero le da una chica al Mago, 30% de 266 = 79
     hecho = m.ejecutarAccion(0, ("pocion", "hpChica", 2), est, RNGFijo(0.5))
     assert est["hp"][2] == 169 + 79 and hecho["curas"] == [("Mago", 79)]
@@ -275,23 +266,24 @@ def testFuriaDesatadaPegaConElBuff():
 
 def testAccionesLegales():
     est = estadoDePrueba()
-    # Con todo lleno no se ofrecen pociones; el guerrero tiene básico, 3 conjuros y bloquear
-    assert m.accionesLegales(0, est) == [("basico", None, None), ("conjuro", 0, None), ("conjuro", 1, None),
-                                         ("conjuro", 2, None), ("bloquear", None, None)]
+    # El guerrero tiene básico, 3 conjuros y bloquear, y luego las pociones
+    sinPociones = [a for a in m.accionesLegales(0, est) if a[0] != "pocion"]
+    assert sinPociones == [("basico", None, None), ("conjuro", 0, None), ("conjuro", 1, None),
+                           ("conjuro", 2, None), ("bloquear", None, None)]
+    # Mientras queden, cualquier poción se le puede dar a cualquier aliado vivo,
+    # aunque esté lleno: decidir si conviene es cosa del jugador
+    pociones = [a for a in m.accionesLegales(0, est) if a[0] == "pocion"]
+    assert len(pociones) == 4 * 4 and ("pocion", "hpChica", 2) in pociones
     # Sin maná desaparecen los conjuros
     est["sp"][0] = 5
     assert ("conjuro", 0, None) not in m.accionesLegales(0, est)
-    # Herido aparecen las pociones de vida, y con poco maná las de maná; cada
-    # poción dice a quién va
-    est["hp"][0] = 50
-    assert ("pocion", "hpChica", 0) in m.accionesLegales(0, est)
-    assert ("pocion", "spGrande", 0) in m.accionesLegales(0, est)
-    # Las pociones son del equipo: el Mago también puede dársela al Guerrero
-    assert ("pocion", "hpChica", 0) in m.accionesLegales(2, est)
-    assert ("pocion", "hpChica", 2) not in m.accionesLegales(2, est)
     # Las que otro ya apartó en esta ronda no se ofrecen
-    est["reservadas"]["hpGrande"] = 2
+    est["reservadas"]["hpGrande"] = 1
     assert ("pocion", "hpGrande", 0) not in m.accionesLegales(2, est)
+    # Ni a los caídos
+    est["hp"][1] = 0
+    assert ("pocion", "hpChica", 1) not in m.accionesLegales(2, est)
+    est["hp"][1] = 562
     # La cura individual del clérigo da una opción por cada aliado vivo
     est["hp"][2] = 0
     assert [a for a in m.accionesLegales(3, est) if a[1] == 0] == [("conjuro", 0, 0), ("conjuro", 0, 1), ("conjuro", 0, 3)]

@@ -145,23 +145,18 @@ def _reparar_resto(crom, enteros):
         ocupados.add(nuevo)
         cambios.append([int(pos) % tamanoCola, nuevo])
 
-    reparado = {"puntos": enteros,
-                "objeto1": int(crom["objeto1"]) % nObjetos, "objeto2": int(crom["objeto2"]) % nObjetos,
-                "habs": habs,
-                "pesos": [int(w) % 4 for w in crom["pesos"]],
-                "cambios": cambios,
-                "ajustes": [int(a) % len(multAjuste) for a in crom["ajustes"]],
-                "predisposicion": [int(p) % 8 for p in crom["predisposicion"]]}
-    # La vida que se le agrega a mano a un jefe ya elegido no es un gen: la
-    # búsqueda nunca la toca, solo se conserva.
-    if crom.get("vidaExtra"):
-        reparado["vidaExtra"] = int(crom["vidaExtra"])
-    return reparado
+    return {"puntos": enteros,
+            "objeto1": int(crom["objeto1"]) % nObjetos, "objeto2": int(crom["objeto2"]) % nObjetos,
+            "habs": habs,
+            "pesos": [int(w) % 4 for w in crom["pesos"]],
+            "cambios": cambios,
+            "ajustes": [int(a) % len(multAjuste) for a in crom["ajustes"]],
+            "predisposicion": [int(p) % 8 for p in crom["predisposicion"]]}
 
 
 def stats_jefe(crom):
     p_hp, p_atk, p_def, pAtkMag, pDefMag, p_vel = crom["puntos"]
-    return {"hp": int(p_hp * HP_POR_PUNTO) + crom.get("vidaExtra", 0),
+    return {"hp": int(p_hp * HP_POR_PUNTO),
             "atk": int(p_atk * ESCALA_ATK / ATK_DIV), "defe": int(p_def * ESCALA_DEF / DEF_DIV),
             "atkMag": int(pAtkMag * ESCALA_ATK / ATK_DIV), "defMag": int(pDefMag * ESCALA_DEF / DEF_DIV),
             "vel": p_vel / DIVISOR_VEL}
