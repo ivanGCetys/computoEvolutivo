@@ -1,0 +1,6 @@
+metodo,evaluaciones,f_busqueda,f_validado,desv,f_min,f_max,t_contra_aleatoria,corridas_que_le_ganan_a_la_media_aleatoria,hipervolumen_validado,tamano_frente,seg_por_corrida
+agFijo,1770,0.8263,0.7562,0.026,0.7201,0.793,3.67,10,,,126.9
+agRotado,1830,0.7767,0.7752,0.0196,0.7308,0.798,5.64,10,,,125.7
+nsga2Fijo,1830,,0.7262,0.0393,0.6356,0.7685,1.09,8,0.4933,26.3,134.9
+nsga2Rotado,1830,,0.7548,0.029,0.7234,0.8049,3.39,10,0.4971,12.4,130.6
+aleatoria,1830,0.7499,0.7087,0.0317,0.6638,0.7721,,,,,132.1
