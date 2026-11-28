@@ -284,8 +284,8 @@ temasDeMusica = ["titulo", "seleccion", "batalla", "batalla2", "victoria", "derr
 
 
 def efectosDeSonido():
-    # Los nombres de los efectos los decide grafico/generarAudio.py; aqui se
-    # leen de su carpeta para no repetir la lista.
+    # Los nombres de los efectos se leen de su carpeta para no repetir la
+    # lista aqui.
     carpeta = os.path.join(carpetaRecursos, "sonidos")
     if not os.path.isdir(carpeta):
         return []

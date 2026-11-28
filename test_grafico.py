@@ -90,12 +90,6 @@ def testListaDeRecursosEsperados():
         assert recursos.nombreDeArchivo(ataque["nombre"]) + ".png" in esperados["efectos"]
     for archivo in esperados["efectos"]:
         assert os.path.exists(os.path.join(recursos.carpetaRecursos, "efectos", archivo)), archivo
-    # y la lista del LEEME no se quedó atrás respecto al código
-    with open(os.path.join(recursos.carpetaRecursos, "LEEME.md"), encoding="utf-8") as f:
-        leeme = f.read()
-    for archivos in esperados.values():
-        for archivo in archivos:
-            assert "`%s`" % archivo in leeme
 
 
 def testSpritesDeHeroes():

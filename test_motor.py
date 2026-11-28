@@ -216,7 +216,10 @@ def testPociones():
     m.ejecutarAccion(2, ("pocion", "hpGrande", None), est, RNGFijo(0.5))    # 60% de 70 x 3.8 = 266 -> 159
     m.ejecutarAccion(2, ("pocion", "spChica", None), est, RNGFijo(0.5))     # 30% de 100 = 30
     assert est["hp"][2] == 169 and est["sp"][2] == 30
-    assert est["pociones"] == {"hpChica": 2, "hpGrande": 0, "spChica": 1, "spGrande": 1}
+    # Se resta de lo que haya al empezar, asi la prueba no depende de cuantas son
+    esperadas = dict(m.pocionesIniciales, hpGrande=m.pocionesIniciales["hpGrande"] - 1,
+                     spChica=m.pocionesIniciales["spChica"] - 1)
+    assert est["pociones"] == esperadas
     # Son de todo el equipo: el Guerrero le da una chica al Mago, 30% de 266 = 79
     hecho = m.ejecutarAccion(0, ("pocion", "hpChica", 2), est, RNGFijo(0.5))
     assert est["hp"][2] == 169 + 79 and hecho["curas"] == [("Mago", 79)]
@@ -278,7 +281,7 @@ def testAccionesLegales():
     est["sp"][0] = 5
     assert ("conjuro", 0, None) not in m.accionesLegales(0, est)
     # Las que otro ya apartó en esta ronda no se ofrecen
-    est["reservadas"]["hpGrande"] = 1
+    est["reservadas"]["hpGrande"] = est["pociones"]["hpGrande"]
     assert ("pocion", "hpGrande", 0) not in m.accionesLegales(2, est)
     # Ni a los caídos
     est["hp"][1] = 0
